@@ -35,9 +35,9 @@
     </ProjectConfiguration>
   </ItemGroup>
   <PropertyGroup Label="Globals">
-    <ProjectGuid>{32a531fe-c7ef-4c4e-9e2e-59d656bba91c}</ProjectGuid>
+    <ProjectGuid>{edef7291-294d-4522-a050-5ade35a686c1}</ProjectGuid>
     <Keyword>Linux</Keyword>
-    <RootNamespace>CSerialServer_TestApp</RootNamespace>
+    <RootNamespace>CSerialClient_TestApp</RootNamespace>
     <MinimumVisualStudioVersion>15.0</MinimumVisualStudioVersion>
     <ApplicationType>Linux</ApplicationType>
     <ApplicationTypeRevision>1.0</ApplicationTypeRevision>
@@ -75,24 +75,22 @@
   <ImportGroup Label="PropertySheets" />
   <PropertyGroup Label="UserMacros" />
   <ItemGroup>
-    <ClCompile Include="..\..\..\..\%40Temp\Serial_Server_Test\CSerialServer_TestApp\CSerialServer_TestApp\CServerTcpRecvThread.cpp" />
+    <ClCompile Include="..\..\..\..\%40Temp\Serial_Server_Test\CSerialClient_TestApp\CSerialClient_TestApp\CClientTcpRecvThread.cpp" />
+    <ClCompile Include="CClientResponseThread.cpp" />
     <ClCompile Include="CEvent.cpp" />
     <ClCompile Include="CEventEx.cpp" />
     <ClCompile Include="CMutex.cpp" />
-    <ClCompile Include="CSerialServer.cpp" />
-    <ClCompile Include="CServerConnectMonitoringThread.cpp" />
-    <ClCompile Include="CServerResponseThread.cpp" />
+    <ClCompile Include="CSerialClient.cpp" />
     <ClCompile Include="CThread.cpp" />
     <ClCompile Include="main.cpp" />
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="..\..\..\..\%40Temp\Serial_Server_Test\CSerialServer_TestApp\CSerialServer_TestApp\CServerTcpRecvThread.h" />
+    <ClInclude Include="..\..\..\..\%40Temp\Serial_Server_Test\CSerialClient_TestApp\CSerialClient_TestApp\CClientTcpRecvThread.h" />
+    <ClInclude Include="CClientResponseThread.h" />
     <ClInclude Include="CEvent.h" />
     <ClInclude Include="CEventEx.h" />
     <ClInclude Include="CMutex.h" />
-    <ClInclude Include="CSerialServer.h" />
-    <ClInclude Include="CServerConnectMonitoringThread.h" />
-    <ClInclude Include="CServerResponseThread.h" />
+    <ClInclude Include="CSerialClient.h" />
     <ClInclude Include="CThread.h" />
     <ClInclude Include="kbhit.h" />
   </ItemGroup>

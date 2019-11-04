@@ -26,7 +26,13 @@ CSerialServer::CSerialServer()
 	m_bInitFlag = false;
 	m_ErrorNo = 0;
 	m_epfd = -1;
-
+	
+	// 接続監視スレッドクラス生成
+	m_pcServerConnectMonitoringThread = (CServerConnectMonitoringThread*)new CServerConnectMonitoringThread();
+	if (m_pcServerConnectMonitoringThread == NULL)
+	{
+		return;
+	}
 
 	// 初期化完了
 	m_bInitFlag = true;
@@ -40,6 +46,13 @@ CSerialServer::~CSerialServer()
 {
 	// SerialServerスレッド停止漏れを考慮
 	this->Stop();
+
+	// 接続監視スレッドクラス解放
+	if (m_pcServerConnectMonitoringThread != NULL)
+	{
+		delete m_pcServerConnectMonitoringThread;
+		m_pcServerConnectMonitoringThread = NULL;
+	}
 }
 
 
@@ -81,6 +94,16 @@ CSerialServer::RESULT_ENUM CSerialServer::Start()
 	{
 		m_ErrorNo = CThread::GetErrorNo();
 		return (CSerialServer::RESULT_ENUM)eThreadRet;
+	}
+
+	// 監視スレッド開始
+	CServerConnectMonitoringThread::RESULT_ENUM eServerConnetMonitoringThreadRet = m_pcServerConnectMonitoringThread->Start();
+	if (eServerConnetMonitoringThreadRet != CServerConnectMonitoringThread::RESULT_SUCCESS)
+	{
+		// SerialServerスレッド停止
+		CThread::Stop();
+
+		return (CSerialServer::RESULT_ENUM)eServerConnetMonitoringThreadRet;
 	}
 
 	return RESULT_SUCCESS;
@@ -135,9 +158,9 @@ void CSerialServer::ThreadProc()
 	if (m_epfd == -1)
 	{
 		m_ErrorNo = errno;
-#ifdef _CLANDRY_CLIENT_DEBUG_
+#ifdef _CSERIAL_SERVER_DEBUG_
 		perror("CSerialServer::ThreadProc - epoll_create");
-#endif	// #ifdef _CLANDRY_CLIENT_DEBUG_
+#endif	// #ifdef _CSERIAL_SERVER_DEBUG_
 		return;
 	}
 

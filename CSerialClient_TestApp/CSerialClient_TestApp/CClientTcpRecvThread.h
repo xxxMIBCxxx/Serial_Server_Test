@@ -12,12 +12,12 @@
 #include "list"
 
 
-#define CTCP_RECV_THREAD_RECV_BUFF_SIZE				( 100 )
-#define CTCP_RECV_THREAD_COMMAND_BUFF_SIZE			( 1000 )
-#define	IP_ADDR_BUFF_SIZE							( 32 )
+#define CCLIENT_TCP_RECV_THREAD_RECV_BUFF_SIZE				( 100 )
+#define CCLIENT_TCP_RECV_THREAD_COMMAND_BUFF_SIZE			( 1000 )
+#define	IP_ADDR_BUFF_SIZE									( 32 )
 
 
-class CTcpRecvThread : public CThread
+class CClientTcpRecvThread : public CThread
 {
 public:
 	// TCP通信受信スレッドクラスの結果種別
@@ -36,13 +36,13 @@ public:
 	} RESULT_ENUM;
 
 
-	// 接続情報構造体
+	// サーバー情報構造体
 	typedef struct
 	{
 		int									Socket;								// ソケット
 		struct sockaddr_in					tAddr;								// インターネットソケットアドレス構造体
 
-	} CONNECT_INFO_TABLE;
+	} SERVER_INFO_TABLE;
 
 	// TCP受信情報構造体 
 	typedef struct
@@ -60,29 +60,30 @@ public:
 	} ANALYZE_KIND_ENUM;
 
 
-	CEvent									m_cDisconnectEvent;					// 切断イベント
 
 	CEventEx								m_cRecvInfoEvent;					// TCP受信情報イベント
 	CMutex									m_cRecvInfoListMutex;				// TCP受信情報リスト用ミューテックス
 	std::list<RECV_INFO_TABLE>				m_RecvInfoList;						// TCP受信情報リスト
 
-	
-	ANALYZE_KIND_ENUM						m_eAnalyzeKind;												// 解析種別
-	char									m_szRecvBuff[CTCP_RECV_THREAD_RECV_BUFF_SIZE + 1];			// 受信バッファ
-	char									m_szCommandBuff[CTCP_RECV_THREAD_COMMAND_BUFF_SIZE + 1];	// 受信コマンドバッファ
-	ssize_t									m_CommandPos;												// 受信コマンド格納位置
+
+	ANALYZE_KIND_ENUM						m_eAnalyzeKind;													// 解析種別
+	char									m_szRecvBuff[CCLIENT_TCP_RECV_THREAD_RECV_BUFF_SIZE + 1];		// 受信バッファ
+	char									m_szCommandBuff[CCLIENT_TCP_RECV_THREAD_COMMAND_BUFF_SIZE + 1];	// 受信コマンドバッファ
+	ssize_t									m_CommandPos;													// 受信コマンド格納位置
 
 private:
 	bool									m_bInitFlag;						// 初期化完了フラグ
 	int										m_ErrorNo;							// エラー番号
 	int										m_epfd;								// epollファイルディスクリプタ（クライアント接続監視スレッドで使用）
-	CONNECT_INFO_TABLE						m_tConnectInfo;						// 接続情報
+	
+	CEvent*									m_pcServerDisconnectEvent;			// 切断イベント
+	SERVER_INFO_TABLE						m_tServerInfo;						// サーバー情報
 	char									m_szIpAddr[IP_ADDR_BUFF_SIZE + 1];	// IPアドレス
 	uint16_t								m_Port;								// ポート番号
 
 public:
-	CTcpRecvThread(CONNECT_INFO_TABLE& tConnectInfo);
-	~CTcpRecvThread();
+	CClientTcpRecvThread(SERVER_INFO_TABLE& tServerInfo, CEvent* pcServerDisconnectEvent);
+	~CClientTcpRecvThread();
 	int GetErrorNo();
 	RESULT_ENUM Start();
 	RESULT_ENUM Stop();

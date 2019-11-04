@@ -1,15 +1,16 @@
 #pragma once
 //*****************************************************************************
-// SerialServerクラス
+// SerialClientクラス
 //*****************************************************************************
 #include "CThread.h"
 #include "CEvent.h"
-#include "CServerConnectMonitoringThread.h"
+#include "CClientResponseThread.h"
 
-class CSerialServer : public CThread
+
+class CSerialClient : public CThread
 {
 public:
-	// SerialServerクラスの結果種別
+	// SerialClientクラスクラスの結果種別
 	typedef enum
 	{
 		RESULT_SUCCESS = 0x00000000,											// 正常終了
@@ -26,28 +27,24 @@ public:
 	} RESULT_ENUM;
 
 
+	CEvent									m_cServerDisconnectEvent;			// サーバー切断イベント
+	CClientResponseThread*					m_pcClinentResponseThread;			// クライアント応答スレッド
 
 
 private:
 	bool									m_bInitFlag;						// 初期化完了フラグ
 	int										m_ErrorNo;							// エラー番号
-	int										m_epfd;								// epollファイルディスクリプタ
-
-	CServerConnectMonitoringThread*			m_pcServerConnectMonitoringThread;	// 接続監視スレッド
-
+	int										m_epfd;								// epollファイルディスクリプタ（クライアント応答スレッドで使用）
 
 public:
-	CSerialServer();
-	~CSerialServer();
-	int GetErrorNo();
+	CSerialClient();
+	~CSerialClient();
 	RESULT_ENUM Start();
 	RESULT_ENUM Stop();
 
 private:
 	void ThreadProc();
 	static void ThreadProcCleanup(void* pArg);
+	RESULT_ENUM CreateClientResponseThread();
+	void DeleteClientResponseThread();
 };
-
-
-
-

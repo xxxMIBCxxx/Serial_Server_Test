@@ -23,8 +23,7 @@ CServerResponseThread::CServerResponseThread(CLIENT_INFO_TABLE& tClientInfo, CEv
 	memset(&m_tClientInfo, 0x00, sizeof(m_tClientInfo));
 	memset(m_szIpAddr, 0x00, sizeof(m_szIpAddr));
 	m_Port = 0;
-	//m_pcTcpSendThread = NULL;
-	m_pcTcpRecvThread = NULL;
+	m_pcServerTcpRecvThread = NULL;
 	m_pcServerResponceThreadEndEvent = NULL;
 	m_bServerResponceThreadEnd = false;
 
@@ -48,11 +47,11 @@ CServerResponseThread::CServerResponseThread(CLIENT_INFO_TABLE& tClientInfo, CEv
 	m_Port = ntohs(m_tClientInfo.tAddr.sin_port);								// ポート番号取得
 
 	// TCP受信スレッドクラスを生成
-	CTcpRecvThread::CLIENT_INFO_TABLE		tTcpRecvClientInfo;
-	tTcpRecvClientInfo.Socket = tClientInfo.Socket;
-	tTcpRecvClientInfo.tAddr = tClientInfo.tAddr;
-	m_pcTcpRecvThread = (CTcpRecvThread*)new CTcpRecvThread(tTcpRecvClientInfo);
-	if (m_pcTcpRecvThread == NULL)
+	CServerTcpRecvThread::CLIENT_INFO_TABLE				tServerTcpRecvThread_ClientInfo;
+	tServerTcpRecvThread_ClientInfo.Socket = tClientInfo.Socket;
+	tServerTcpRecvThread_ClientInfo.tAddr = tClientInfo.tAddr;
+	m_pcServerTcpRecvThread = (CServerTcpRecvThread*)new CServerTcpRecvThread(tServerTcpRecvThread_ClientInfo);
+	if (m_pcServerTcpRecvThread == NULL)
 	{
 		return;
 	}
@@ -71,10 +70,10 @@ CServerResponseThread::~CServerResponseThread()
 	this->Stop();
 
 	// TCP受信スレッドクラスを破棄
-	if (m_pcTcpRecvThread != NULL)
+	if (m_pcServerTcpRecvThread != NULL)
 	{
-		delete m_pcTcpRecvThread;
-		m_pcTcpRecvThread = NULL;
+		delete m_pcServerTcpRecvThread;
+		m_pcServerTcpRecvThread = NULL;
 	}
 
 	// クライアント側のソケットを解放
@@ -109,11 +108,11 @@ CServerResponseThread::RESULT_ENUM CServerResponseThread::Start()
 	}
 
 	// TCP受信スレッド開始
-	CTcpRecvThread::RESULT_ENUM eTcpRecvThreadResult = m_pcTcpRecvThread->Start();
-	if (eTcpRecvThreadResult != CTcpRecvThread::RESULT_SUCCESS)
+	CServerTcpRecvThread::RESULT_ENUM eServerTcpRecvThreadResult = m_pcServerTcpRecvThread->Start();
+	if (eServerTcpRecvThreadResult != CServerTcpRecvThread::RESULT_SUCCESS)
 	{
-		m_ErrorNo = m_pcTcpRecvThread->GetErrorNo();
-		return (CServerResponseThread::RESULT_ENUM)eTcpRecvThreadResult;
+		m_ErrorNo = m_pcServerTcpRecvThread->GetErrorNo();
+		return (CServerResponseThread::RESULT_ENUM)eServerTcpRecvThreadResult;
 	}
 
 	// サーバー応答スレッド開始
@@ -150,7 +149,7 @@ CServerResponseThread::RESULT_ENUM CServerResponseThread::Stop()
 	}
 
 	// TCP受信スレッド停止
-	m_pcTcpRecvThread->Stop();
+	m_pcServerTcpRecvThread->Stop();
 
 	// サーバー応答スレッド停止
 	CThread::Stop();
@@ -202,8 +201,8 @@ void CServerResponseThread::ThreadProc()
 	// クライアント切断イベントを登録
 	memset(&tEvent, 0x00, sizeof(tEvent));
 	tEvent.events = EPOLLIN;
-	tEvent.data.fd = this->m_pcTcpRecvThread->m_cDisconnectEvent.GetEventFd();
-	iRet = epoll_ctl(m_epfd, EPOLL_CTL_ADD, this->m_pcTcpRecvThread->m_cDisconnectEvent.GetEventFd(), &tEvent);
+	tEvent.data.fd = this->m_pcServerTcpRecvThread->m_cClientDisconnectEvent.GetEventFd();
+	iRet = epoll_ctl(m_epfd, EPOLL_CTL_ADD, this->m_pcServerTcpRecvThread->m_cClientDisconnectEvent.GetEventFd(), &tEvent);
 	if (iRet == -1)
 	{
 		m_ErrorNo = errno;
@@ -216,8 +215,8 @@ void CServerResponseThread::ThreadProc()
 	// TCP受信情報イベントを登録
 	memset(&tEvent, 0x00, sizeof(tEvent));
 	tEvent.events = EPOLLIN;
-	tEvent.data.fd = this->m_pcTcpRecvThread->m_cRecvInfoEvent.GetEventFd();
-	iRet = epoll_ctl(m_epfd, EPOLL_CTL_ADD, this->m_pcTcpRecvThread->m_cRecvInfoEvent.GetEventFd(), &tEvent);
+	tEvent.data.fd = this->m_pcServerTcpRecvThread->m_cRecvInfoEvent.GetEventFd();
+	iRet = epoll_ctl(m_epfd, EPOLL_CTL_ADD, this->m_pcServerTcpRecvThread->m_cRecvInfoEvent.GetEventFd(), &tEvent);
 	if (iRet == -1)
 	{
 		m_ErrorNo = errno;
@@ -260,9 +259,9 @@ void CServerResponseThread::ThreadProc()
 				break;
 			}
 			// クライアント切断イベント
-			else if (tEvents[i].data.fd == this->m_pcTcpRecvThread->m_cDisconnectEvent.GetEventFd())
+			else if (tEvents[i].data.fd == this->m_pcServerTcpRecvThread->m_cClientDisconnectEvent.GetEventFd())
 			{
-				this->m_pcTcpRecvThread->m_cDisconnectEvent.ClearEvent();
+				this->m_pcServerTcpRecvThread->m_cClientDisconnectEvent.ClearEvent();
 
 				// サーバー応答スレッド終了フラグを立てて、サーバー応答スレッド終了イベントを送信する
 				m_bServerResponceThreadEnd = true;
@@ -270,12 +269,18 @@ void CServerResponseThread::ThreadProc()
 				break;
 			}
 			// TCP受信情報イベント
-			else if (tEvents[i].data.fd == this->m_pcTcpRecvThread->m_cRecvInfoEvent.GetEventFd())
+			else if (tEvents[i].data.fd == this->m_pcServerTcpRecvThread->m_cRecvInfoEvent.GetEventFd())
 			{
-				CTcpRecvThread::RECV_INFO_TABLE		tRecvInfo;
-				this->m_pcTcpRecvThread->GetRecvData(tRecvInfo);
-				printf("[%s (%d)] - %s\n", this->m_szIpAddr, this->m_Port, tRecvInfo.pData);
-				free(tRecvInfo.pData);
+				CServerTcpRecvThread::RECV_INFO_TABLE		tRecvInfo;
+				CServerTcpRecvThread::RESULT_ENUM eServerTcpRecvThreadRet = this->m_pcServerTcpRecvThread->GetRecvData(tRecvInfo);
+				if (eServerTcpRecvThreadRet == CServerTcpRecvThread::RESULT_SUCCESS)
+				{
+					printf("[%s (%d)] - %s\n", this->m_szIpAddr, this->m_Port, tRecvInfo.pData);
+					if (tRecvInfo.pData != NULL)
+					{
+						free(tRecvInfo.pData);
+					}
+				}
 			}
 		}
 	}

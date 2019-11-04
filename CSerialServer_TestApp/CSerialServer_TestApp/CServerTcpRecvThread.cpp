@@ -6,10 +6,10 @@
 #include <sys/types.h>
 #include <sys/epoll.h>
 #include <sys/eventfd.h>
-#include "CTcpRecvThread.h"
+#include "CServerTcpRecvThread.h"
 
 
-#define _CTCP_RECV_THREAD_DEBUG_
+#define _CSERVER_TCP_RECV_THREAD_DEBUG_
 #define EPOLL_MAX_EVENTS							( 10 )						// epoll最大イベント
 #define STX											( 0x02 )					// STX
 #define ETX											( 0x03 )					// ETX
@@ -17,7 +17,7 @@
 //-----------------------------------------------------------------------------
 // コンストラクタ
 //-----------------------------------------------------------------------------
-CTcpRecvThread::CTcpRecvThread(CONNECT_INFO_TABLE& tConnectInfo)
+CServerTcpRecvThread::CServerTcpRecvThread(CLIENT_INFO_TABLE& tClientInfo)
 {
 	bool						bRet = false;
 	CEvent::RESULT_ENUM			eEventRet = CEvent::RESULT_SUCCESS;
@@ -27,7 +27,7 @@ CTcpRecvThread::CTcpRecvThread(CONNECT_INFO_TABLE& tConnectInfo)
 	m_bInitFlag = false;
 	m_ErrorNo = 0;
 	m_epfd = -1;
-	m_tConnectInfo = tConnectInfo;
+	m_tClientInfo = tClientInfo;
 	memset(m_szIpAddr, 0x00, sizeof(m_szIpAddr));
 	m_Port = 0;
 	m_eAnalyzeKind = ANALYZE_KIND_STX;
@@ -37,11 +37,11 @@ CTcpRecvThread::CTcpRecvThread(CONNECT_INFO_TABLE& tConnectInfo)
 
 
 	// 接続情報を取得
-	sprintf(m_szIpAddr, "%s", inet_ntoa(m_tConnectInfo.tAddr.sin_addr));		// IPアドレス取得
-	m_Port = ntohs(m_tConnectInfo.tAddr.sin_port);								// ポート番号取得
+	sprintf(m_szIpAddr, "%s", inet_ntoa(m_tClientInfo.tAddr.sin_addr));			// IPアドレス取得
+	m_Port = ntohs(m_tClientInfo.tAddr.sin_port);								// ポート番号取得
 
-	// 切断イベントの初期化
-	eEventRet = m_cDisconnectEvent.Init();
+	// クライアント切断イベントの初期化
+	eEventRet = m_cClientDisconnectEvent.Init();
 	if (eEventRet != CEvent::RESULT_SUCCESS)
 	{
 		return;
@@ -66,7 +66,7 @@ CTcpRecvThread::CTcpRecvThread(CONNECT_INFO_TABLE& tConnectInfo)
 //-----------------------------------------------------------------------------
 // デストラクタ
 //-----------------------------------------------------------------------------
-CTcpRecvThread::~CTcpRecvThread()
+CServerTcpRecvThread::~CServerTcpRecvThread()
 {
 	// TCP通信受信スレッド停止し忘れ考慮
 	this->Stop();
@@ -79,7 +79,7 @@ CTcpRecvThread::~CTcpRecvThread()
 //-----------------------------------------------------------------------------
 // エラー番号を取得
 //-----------------------------------------------------------------------------
-int CTcpRecvThread::GetErrorNo()
+int CServerTcpRecvThread::GetErrorNo()
 {
 	return m_ErrorNo;
 }
@@ -88,7 +88,7 @@ int CTcpRecvThread::GetErrorNo()
 //-----------------------------------------------------------------------------
 // TCP通信受信スレッド開始
 //-----------------------------------------------------------------------------
-CTcpRecvThread::RESULT_ENUM CTcpRecvThread::Start()
+CServerTcpRecvThread::RESULT_ENUM CServerTcpRecvThread::Start()
 {
 	bool						bRet = false;
 	RESULT_ENUM					eRet = RESULT_SUCCESS;
@@ -98,9 +98,9 @@ CTcpRecvThread::RESULT_ENUM CTcpRecvThread::Start()
 	// 初期化処理が完了していない場合
 	if (m_bInitFlag == false)
 	{
-#ifdef _CTCP_RECV_THREAD_DEBUG_
-		printf("CTcpRecvThread::Start - Not Init Proc.\n");
-#endif	// #ifdef _CTCP_RECV_THREAD_DEBUG_
+#ifdef _CSERVER_TCP_RECV_THREAD_DEBUG_
+		printf("CServerTcpRecvThread::Start - Not Init Proc.\n");
+#endif	// #ifdef _CSERVER_TCP_RECV_THREAD_DEBUG_
 		return RESULT_ERROR_INIT;
 	}
 
@@ -108,9 +108,9 @@ CTcpRecvThread::RESULT_ENUM CTcpRecvThread::Start()
 	bRet = this->IsActive();
 	if (bRet == true)
 	{
-#ifdef _CTCP_RECV_THREAD_DEBUG_
-		printf("CTcpRecvThread::Start - Thread Active.\n");
-#endif	// #ifdef _CTCP_RECV_THREAD_DEBUG_
+#ifdef _CSERVER_TCP_RECV_THREAD_DEBUG_
+		printf("CServerTcpRecvThread::Start - Thread Active.\n");
+#endif	// #ifdef _CSERVER_TCP_RECV_THREAD_DEBUG_
 		return RESULT_ERROR_ALREADY_STARTED;
 	}
 
@@ -119,7 +119,7 @@ CTcpRecvThread::RESULT_ENUM CTcpRecvThread::Start()
 	if (eThreadRet != CThread::RESULT_SUCCESS)
 	{
 		m_ErrorNo = CThread::GetErrorNo();
-		return (CTcpRecvThread::RESULT_ENUM)eThreadRet;
+		return (CServerTcpRecvThread::RESULT_ENUM)eThreadRet;
 	}
 
 	return RESULT_SUCCESS;
@@ -129,7 +129,7 @@ CTcpRecvThread::RESULT_ENUM CTcpRecvThread::Start()
 //-----------------------------------------------------------------------------
 // TCP通信受信スレッド停止
 //-----------------------------------------------------------------------------
-CTcpRecvThread::RESULT_ENUM CTcpRecvThread::Stop()
+CServerTcpRecvThread::RESULT_ENUM CServerTcpRecvThread::Stop()
 {
 	bool						bRet = false;
 
@@ -137,9 +137,9 @@ CTcpRecvThread::RESULT_ENUM CTcpRecvThread::Stop()
 	// 初期化処理が完了していない場合
 	if (m_bInitFlag == false)
 	{
-#ifdef _CTCP_RECV_THREAD_DEBUG_
-		printf("CTcpRecvThread::Stop - Not Init Proc.\n");
-#endif	// #ifdef _CTCP_RECV_THREAD_DEBUG_
+#ifdef _CSERVER_TCP_RECV_THREAD_DEBUG_
+		printf("CServerTcpRecvThread::Stop - Not Init Proc.\n");
+#endif	// #ifdef _CSERVER_TCP_RECV_THREAD_DEBUG_
 		return RESULT_ERROR_INIT;
 	}
 
@@ -163,7 +163,7 @@ CTcpRecvThread::RESULT_ENUM CTcpRecvThread::Stop()
 //-----------------------------------------------------------------------------
 // TCP通信受信スレッド
 //-----------------------------------------------------------------------------
-void CTcpRecvThread::ThreadProc()
+void CServerTcpRecvThread::ThreadProc()
 {
 	int							iRet = 0;
 	struct epoll_event			tEvent;
@@ -179,9 +179,9 @@ void CTcpRecvThread::ThreadProc()
 	if (m_epfd == -1)
 	{
 		m_ErrorNo = errno;
-#ifdef _CTCP_RECV_THREAD_DEBUG_
-		perror("CTcpRecvThread::ThreadProc - epoll_create");
-#endif	// #ifdef _CTCP_RECV_THREAD_DEBUG_
+#ifdef _CSERVER_TCP_RECV_THREAD_DEBUG_
+		perror("CServerTcpRecvThread::ThreadProc - epoll_create");
+#endif	// #ifdef _CSERVER_TCP_RECV_THREAD_DEBUG_
 		return;
 	}
 
@@ -193,23 +193,23 @@ void CTcpRecvThread::ThreadProc()
 	if (iRet == -1)
 	{
 		m_ErrorNo = errno;
-#ifdef _CTCP_RECV_THREAD_DEBUG_
-		perror("CTcpRecvThread::ThreadProc - epoll_ctl[ThreadEndReqEvent]");
-#endif	// #ifdef _CTCP_RECV_THREAD_DEBUG_
+#ifdef _CSERVER_TCP_RECV_THREAD_DEBUG_
+		perror("CServerTcpRecvThread::ThreadProc - epoll_ctl[ThreadEndReqEvent]");
+#endif	// #ifdef _CSERVER_TCP_RECV_THREAD_DEBUG_
 		return;
 	}
 
 	// TCP受信用のソケットを登録
 	memset(&tEvent, 0x00, sizeof(tEvent));
 	tEvent.events = EPOLLIN;
-	tEvent.data.fd = this->m_tConnectInfo.Socket;
-	iRet = epoll_ctl(m_epfd, EPOLL_CTL_ADD, this->m_tConnectInfo.Socket, &tEvent);
+	tEvent.data.fd = this->m_tClientInfo.Socket;
+	iRet = epoll_ctl(m_epfd, EPOLL_CTL_ADD, this->m_tClientInfo.Socket, &tEvent);
 	if (iRet == -1)
 	{
 		m_ErrorNo = errno;
-#ifdef _CTCP_RECV_THREAD_DEBUG_
-		perror("CTcpRecvThread::ThreadProc - epoll_ctl[RecvResponseEvent]");
-#endif	// #ifdef _CTCP_RECV_THREAD_DEBUG_
+#ifdef _CSERVER_TCP_RECV_THREAD_DEBUG_
+		perror("CServerTcpRecvThread::ThreadProc - epoll_ctl[ClientInfo.Socket]");
+#endif	// #ifdef _CSERVER_TCP_RECV_THREAD_DEBUG_
 		return;
 	}
 
@@ -226,9 +226,9 @@ void CTcpRecvThread::ThreadProc()
 		if (nfds == -1)
 		{
 			m_ErrorNo = errno;
-#ifdef _CTCP_RECV_THREAD_DEBUG_
-			perror("CTcpRecvThread::ThreadProc - epoll_wait");
-#endif	// #ifdef _CTCP_RECV_THREAD_DEBUG_
+#ifdef _CSERVER_TCP_RECV_THREAD_DEBUG_
+			perror("CServerTcpRecvThread::ThreadProc - epoll_wait");
+#endif	// #ifdef _CSERVER_TCP_RECV_THREAD_DEBUG_
 			continue;
 		}
 		else if (nfds == 0)
@@ -245,7 +245,7 @@ void CTcpRecvThread::ThreadProc()
 				break;
 			}
 			// TCP受信用のソケット
-			else if (this->m_tConnectInfo.Socket)
+			else if (this->m_tClientInfo.Socket)
 			{
 				// TCP受信処理
 				TcpRecvProc();
@@ -263,21 +263,21 @@ void CTcpRecvThread::ThreadProc()
 //-----------------------------------------------------------------------------
 // TCP通信受信スレッド終了時に呼ばれる処理
 //-----------------------------------------------------------------------------
-void CTcpRecvThread::ThreadProcCleanup(void* pArg)
+void CServerTcpRecvThread::ThreadProcCleanup(void* pArg)
 {
 	// パラメータチェック
 	if (pArg == NULL)
 	{
 		return;
 	}
-	CTcpRecvThread* pcTcpRecvThread = (CTcpRecvThread*)pArg;
+	CServerTcpRecvThread* pcServerTcpRecvThread = (CServerTcpRecvThread*)pArg;
 
 
 	// epollファイルディスクリプタ解放
-	if (pcTcpRecvThread->m_epfd != -1)
+	if (pcServerTcpRecvThread->m_epfd != -1)
 	{
-		close(pcTcpRecvThread->m_epfd);
-		pcTcpRecvThread->m_epfd = -1;
+		close(pcServerTcpRecvThread->m_epfd);
+		pcServerTcpRecvThread->m_epfd = -1;
 	}
 }
 
@@ -285,7 +285,7 @@ void CTcpRecvThread::ThreadProcCleanup(void* pArg)
 //-----------------------------------------------------------------------------
 // TCP受信情報リストをクリアする
 //-----------------------------------------------------------------------------
-void CTcpRecvThread::RecvInfoList_Clear()
+void CServerTcpRecvThread::RecvInfoList_Clear()
 {
 	// ▼▽▼▽▼▽▼▽▼▽▼▽▼▽▼▽▼▽▼▽▼▽▼▽▼▽▼▽▼
 	m_cRecvInfoListMutex.Lock();
@@ -314,8 +314,14 @@ void CTcpRecvThread::RecvInfoList_Clear()
 
 //-----------------------------------------------------------------------------
 // TCP受信データ取得
+// ※TCP受信データ設定と別スレッドで取得する場合、取得する直前でスレッド停止する
+//   と戻り値が「既にスレッドが動作していない：RESULT_ERROR_NOT_ACTIVE」となり、
+//   TCP受信データを取得していないにも関わらずデータ領域を解放(free）してしまい
+//	 ２重解放エラー（領域をとっていない場所を解放）となる不具合が発生
+//   上記より、本関数の戻り値が「RESULT_SUCCESS」の時だけ取得した受信データを
+//   参照するようにしてください
 //-----------------------------------------------------------------------------
-CTcpRecvThread::RESULT_ENUM CTcpRecvThread::GetRecvData(RECV_INFO_TABLE& tRecvInfo)
+CServerTcpRecvThread::RESULT_ENUM CServerTcpRecvThread::GetRecvData(RECV_INFO_TABLE& tRecvInfo)
 {
 	bool					bRet = false;
 
@@ -323,9 +329,9 @@ CTcpRecvThread::RESULT_ENUM CTcpRecvThread::GetRecvData(RECV_INFO_TABLE& tRecvIn
 	// 初期化処理が完了していない場合
 	if (m_bInitFlag == false)
 	{
-#ifdef _CTCP_RECV_THREAD_DEBUG_
-		printf("CTcpRecvThread::GetRecvData - Not Init Proc.\n");
-#endif	// #ifdef _CTCP_RECV_THREAD_DEBUG_
+#ifdef _CSERVER_TCP_RECV_THREAD_DEBUG_
+		printf("CServerTcpRecvThread::GetRecvData - Not Init Proc.\n");
+#endif	// #ifdef _CSERVER_TCP_RECV_THREAD_DEBUG_
 		return RESULT_ERROR_INIT;
 	}
 
@@ -338,6 +344,7 @@ CTcpRecvThread::RESULT_ENUM CTcpRecvThread::GetRecvData(RECV_INFO_TABLE& tRecvIn
 
 	// ▼▽▼▽▼▽▼▽▼▽▼▽▼▽▼▽▼▽▼▽▼▽▼▽▼▽▼▽▼
 	m_cRecvInfoListMutex.Lock();
+	printf("[%s (%d)] - =======================================================\n", m_szIpAddr, m_Port);
 
 	// TCP受信情報リストに登録データある場合
 	if (m_RecvInfoList.empty() != true)
@@ -348,6 +355,8 @@ CTcpRecvThread::RESULT_ENUM CTcpRecvThread::GetRecvData(RECV_INFO_TABLE& tRecvIn
 		m_RecvInfoList.pop_front();
 	}
 
+	printf("[%s (%d)] - pData : %p\n", m_szIpAddr, m_Port, tRecvInfo.pData);
+	printf("[%s (%d)] - =======================================================\n", m_szIpAddr, m_Port);
 	m_cRecvInfoListMutex.Unlock();
 	// ▲△▲△▲△▲△▲△▲△▲△▲△▲△▲△▲△▲△▲△▲△▲
 
@@ -361,7 +370,7 @@ CTcpRecvThread::RESULT_ENUM CTcpRecvThread::GetRecvData(RECV_INFO_TABLE& tRecvIn
 //-----------------------------------------------------------------------------
 // TCP受信データ設定
 //-----------------------------------------------------------------------------
-CTcpRecvThread::RESULT_ENUM CTcpRecvThread::SetRecvData(RECV_INFO_TABLE& tRecvInfo)
+CServerTcpRecvThread::RESULT_ENUM CServerTcpRecvThread::SetRecvData(RECV_INFO_TABLE& tRecvInfo)
 {
 	bool					bRet = false;
 
@@ -375,9 +384,9 @@ CTcpRecvThread::RESULT_ENUM CTcpRecvThread::SetRecvData(RECV_INFO_TABLE& tRecvIn
 	// 初期化処理が完了していない場合
 	if (m_bInitFlag == false)
 	{
-#ifdef _CTCP_RECV_THREAD_DEBUG_
-		printf("CTcpRecvThread::SetRecvData - Not Init Proc.\n");
-#endif	// #ifdef _CTCP_RECV_THREAD_DEBUG_
+#ifdef _CSERVER_TCP_RECV_THREAD_DEBUG_
+		printf("CServerTcpRecvThread::SetRecvData - Not Init Proc.\n");
+#endif	// #ifdef _CSERVER_TCP_RECV_THREAD_DEBUG_
 		return RESULT_ERROR_INIT;
 	}
 
@@ -390,10 +399,13 @@ CTcpRecvThread::RESULT_ENUM CTcpRecvThread::SetRecvData(RECV_INFO_TABLE& tRecvIn
 
 	// ▼▽▼▽▼▽▼▽▼▽▼▽▼▽▼▽▼▽▼▽▼▽▼▽▼▽▼▽▼
 	m_cRecvInfoListMutex.Lock();
+	printf("[%s (%d)] - +++++++++++++++++++++++++++++++++++++++++++++++++++++++\n", m_szIpAddr, m_Port);
 
 	// TCP受信情報リストに登録
 	m_RecvInfoList.push_back(tRecvInfo);
 
+	printf("[%s (%d)] - pData : %p\n", m_szIpAddr, m_Port, tRecvInfo.pData);
+	printf("[%s (%d)] - +++++++++++++++++++++++++++++++++++++++++++++++++++++++\n", m_szIpAddr, m_Port);
 	m_cRecvInfoListMutex.Unlock();
 	// ▲△▲△▲△▲△▲△▲△▲△▲△▲△▲△▲△▲△▲△▲△▲
 
@@ -407,33 +419,47 @@ CTcpRecvThread::RESULT_ENUM CTcpRecvThread::SetRecvData(RECV_INFO_TABLE& tRecvIn
 //-----------------------------------------------------------------------------
 // TCP受信処理
 //-----------------------------------------------------------------------------
-CTcpRecvThread::RESULT_ENUM CTcpRecvThread::TcpRecvProc()
+CServerTcpRecvThread::RESULT_ENUM CServerTcpRecvThread::TcpRecvProc()
 {
 	ssize_t					read_count = 0;
 	// TCP受信処理
 	memset(m_szRecvBuff, 0x00, sizeof(m_szRecvBuff));
-	read_count = read(m_tConnectInfo.Socket, m_szRecvBuff, CTCP_RECV_THREAD_RECV_BUFF_SIZE);
+	read_count = read(m_tClientInfo.Socket, m_szRecvBuff, CSERVER_TCP_RECV_THREAD_RECV_BUFF_SIZE);
 	if (read_count < 0)
 	{
 		m_ErrorNo = errno;
-#ifdef _CTCP_RECV_THREAD_DEBUG_
-		perror("CTcpRecvThread::TcpRecvProc - read");
-#endif	// #ifdef _CTCP_RECV_THREAD_DEBUG_
+#ifdef _CSERVER_TCP_RECV_THREAD_DEBUG_
+		perror("CServerTcpRecvThread::TcpRecvProc - read");
+#endif	// #ifdef _CSERVER_TCP_RECV_THREAD_DEBUG_
 		return RESULT_ERROR_RECV;
 	}
 	else if (read_count == 0)
 	{
-		// 切断するとTCP受信ソケットの通知が何度も来るので、TCP受信ソケットイベント登録を解除する
-		epoll_ctl(m_epfd, EPOLL_CTL_DEL, this->m_tConnectInfo.Socket, NULL);
+		// クライアント側が切断するとTCP受信ソケットの通知が何度も来るので、TCP受信ソケットイベント登録を解除する
+		epoll_ctl(m_epfd, EPOLL_CTL_DEL, this->m_tClientInfo.Socket, NULL);
 
-		// 切断されたので、切断イベントを送信する
+		// クライアント側が切断されたので、クライアント切断イベントを送信する
 		printf("[%s (%d)] - Client Disconnect!\n", m_szIpAddr, m_Port);
-		m_cDisconnectEvent.SetEvent();
+		m_cClientDisconnectEvent.SetEvent();
 	}
 	else
 	{
+#if 0
 		// TCP受信データ解析
 		TcpRecvDataAnalyze(m_szRecvBuff, read_count);
+#else
+		// TCP受信応答
+		RECV_INFO_TABLE		tRecvInfo;
+		memset(&tRecvInfo, 0x00, sizeof(tRecvInfo));
+		tRecvInfo.pReceverClass = this;
+		tRecvInfo.DataSize = strlen(m_szRecvBuff) + 1;			// Debug用
+		tRecvInfo.pData = (char*)malloc(tRecvInfo.DataSize);
+		if (tRecvInfo.pData != NULL)
+		{
+			memcpy(tRecvInfo.pData, m_szRecvBuff, tRecvInfo.DataSize);
+			this->SetRecvData(tRecvInfo);
+		}
+#endif
 	}
 
 	return RESULT_SUCCESS;
@@ -443,7 +469,7 @@ CTcpRecvThread::RESULT_ENUM CTcpRecvThread::TcpRecvProc()
 //-----------------------------------------------------------------------------
 // TCP受信データ解析
 //-----------------------------------------------------------------------------
-CTcpRecvThread::RESULT_ENUM CTcpRecvThread::TcpRecvDataAnalyze(char* pRecvData, ssize_t RecvDataNum)
+CServerTcpRecvThread::RESULT_ENUM CServerTcpRecvThread::TcpRecvDataAnalyze(char* pRecvData, ssize_t RecvDataNum)
 {
 	RESULT_ENUM					eRet = RESULT_SUCCESS;
 
@@ -500,18 +526,18 @@ CTcpRecvThread::RESULT_ENUM CTcpRecvThread::TcpRecvDataAnalyze(char* pRecvData, 
 				tRecvInfo.pData = (char*)malloc(tRecvInfo.DataSize);
 				if (tRecvInfo.pData == NULL)
 				{
-#ifdef _CTCP_RECV_THREAD_DEBUG_
-					printf("CTcpRecvThread::TcpRecvDataAnalyze - malloc error.\n");
-#endif	// #ifdef _CTCP_RECV_THREAD_DEBUG_
+#ifdef _CSERVER_TCP_RECV_THREAD_DEBUG_
+					printf("CServerTcpRecvThread::TcpRecvDataAnalyze - malloc error.\n");
+#endif	// #ifdef _CSERVER_TCP_RECV_THREAD_DEBUG_
 					return RESULT_ERROR_SYSTEM;
 				}
 				memcpy(tRecvInfo.pData, m_szCommandBuff, tRecvInfo.DataSize);
 				eRet = this->SetRecvData(tRecvInfo);
 				if (eRet != RESULT_SUCCESS)
 				{
-#ifdef _CTCP_RECV_THREAD_DEBUG_
-					printf("CTcpRecvThread::TcpRecvDataAnalyze - SetRecvData error.\n");
-#endif	// #ifdef _CTCP_RECV_THREAD_DEBUG_
+#ifdef _CSERVER_TCP_RECV_THREAD_DEBUG_
+					printf("CServerTcpRecvThread::TcpRecvDataAnalyze - SetRecvData error.\n");
+#endif	// #ifdef _CSERVER_TCP_RECV_THREAD_DEBUG_
 					return eRet;
 				}
 			}
@@ -519,11 +545,11 @@ CTcpRecvThread::RESULT_ENUM CTcpRecvThread::TcpRecvDataAnalyze(char* pRecvData, 
 			{
 				// 受信データを格納
 				m_szCommandBuff[m_CommandPos++] = ch;
-				if (m_CommandPos >= CTCP_RECV_THREAD_COMMAND_BUFF_SIZE)
+				if (m_CommandPos >= CSERVER_TCP_RECV_THREAD_COMMAND_BUFF_SIZE)
 				{
-#ifdef _CTCP_RECV_THREAD_DEBUG_
-					printf("CTcpRecvThread::TcpRecvDataAnalyze - Command Buffer Over.\n");
-#endif	// #ifdef _CTCP_RECV_THREAD_DEBUG_
+#ifdef _CSERVER_TCP_RECV_THREAD_DEBUG_
+					printf("CServerTcpRecvThread::TcpRecvDataAnalyze - Command Buffer Over.\n");
+#endif	// #ifdef _CSERVER_TCP_RECV_THREAD_DEBUG_
 					return RESULT_ERROR_COMMAND_BUFF_OVER;
 				}
 			}
@@ -532,16 +558,4 @@ CTcpRecvThread::RESULT_ENUM CTcpRecvThread::TcpRecvDataAnalyze(char* pRecvData, 
 
 	return RESULT_SUCCESS;
 }
-
-
-
-
-
-
-
-
-
-
-
-
 

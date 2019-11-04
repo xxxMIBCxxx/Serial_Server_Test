@@ -40,7 +40,7 @@ public:
 private:
 	bool									m_bInitFlag;						// 初期化完了フラグ
 	int										m_ErrorNo;							// エラー番号
-	int										m_epfd;								// epollファイルディスクリプタ（クライアント接続監視スレッドで使用）
+	int										m_epfd;								// epollファイルディスクリプタ
 
 	SERVER_INFO_TABLE						m_tServerInfo;						// サーバー情報
 
