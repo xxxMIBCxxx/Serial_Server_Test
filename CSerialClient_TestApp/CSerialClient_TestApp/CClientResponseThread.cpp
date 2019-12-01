@@ -278,7 +278,7 @@ CClientResponseThread::RESULT_ENUM CClientResponseThread::ServerConnect(SERVER_I
 	// サーバー接続先を設定
 	tServerInfo.tAddr.sin_family = AF_INET;
 	tServerInfo.tAddr.sin_port = htons(12345);							// ← ポート番号
-	tServerInfo.tAddr.sin_addr.s_addr = inet_addr("192.168.10.9");		// ← IPアドレス
+	tServerInfo.tAddr.sin_addr.s_addr = inet_addr("192.168.10.10");		// ← IPアドレス
 	if (tServerInfo.tAddr.sin_addr.s_addr == 0xFFFFFFFF)
 	{
 		// ホスト名からIPアドレスを取得

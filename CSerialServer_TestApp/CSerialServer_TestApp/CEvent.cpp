@@ -3,6 +3,9 @@
 //*****************************************************************************
 #include "CEvent.h"
 #include <sys/eventfd.h>
+#include <sys/select.h>
+#include <sys/time.h>
+#include <sys/types.h>
 #include <fcntl.h>
 #include <unistd.h>
 #include <errno.h>
