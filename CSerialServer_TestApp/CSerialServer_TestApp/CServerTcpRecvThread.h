@@ -47,9 +47,9 @@ public:
 	// TCP受信情報構造体 
 	typedef struct
 	{
-		void* pReceverClass;						// 受信先クラス
+		void*								pReceverClass;						// 受信先クラス
 		ssize_t								DataSize;							// 受信データサイズ
-		char* pData;								// 受信データ（※受信先にてデータが不要となったら、freeを使用して領域を解放してください）
+		char*								pData;								// 受信データ（※受信先にてデータが不要となったら、freeを使用して領域を解放してください）
 	} RECV_INFO_TABLE;
 
 	// 解析種別

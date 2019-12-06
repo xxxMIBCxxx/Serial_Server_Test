@@ -75,6 +75,10 @@
   <ImportGroup Label="PropertySheets" />
   <PropertyGroup Label="UserMacros" />
   <ItemGroup>
+    <ClCompile Include="..\..\..\..\%40Temp\Serial_Server_Test\CSerialServer_TestApp\CSerialServer_TestApp\CConfFile.cpp" />
+    <ClCompile Include="..\..\..\..\%40Temp\Serial_Server_Test\CSerialServer_TestApp\CSerialServer_TestApp\CLog.cpp" />
+    <ClCompile Include="..\..\..\..\%40Temp\Serial_Server_Test\CSerialServer_TestApp\CSerialServer_TestApp\CSerialRecvThread.cpp" />
+    <ClCompile Include="..\..\..\..\%40Temp\Serial_Server_Test\CSerialServer_TestApp\CSerialServer_TestApp\CSerialThread.cpp" />
     <ClCompile Include="..\..\..\..\%40Temp\Serial_Server_Test\CSerialServer_TestApp\CSerialServer_TestApp\CServerTcpRecvThread.cpp" />
     <ClCompile Include="CEvent.cpp" />
     <ClCompile Include="CEventEx.cpp" />
@@ -86,6 +90,10 @@
     <ClCompile Include="main.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="..\..\..\..\%40Temp\Serial_Server_Test\CSerialServer_TestApp\CSerialServer_TestApp\CConfFile.h" />
+    <ClInclude Include="..\..\..\..\%40Temp\Serial_Server_Test\CSerialServer_TestApp\CSerialServer_TestApp\CLog.h" />
+    <ClInclude Include="..\..\..\..\%40Temp\Serial_Server_Test\CSerialServer_TestApp\CSerialServer_TestApp\CSerialRecvThread.h" />
+    <ClInclude Include="..\..\..\..\%40Temp\Serial_Server_Test\CSerialServer_TestApp\CSerialServer_TestApp\CSerialThread.h" />
     <ClInclude Include="..\..\..\..\%40Temp\Serial_Server_Test\CSerialServer_TestApp\CSerialServer_TestApp\CServerTcpRecvThread.h" />
     <ClInclude Include="CEvent.h" />
     <ClInclude Include="CEventEx.h" />
@@ -100,6 +108,11 @@
     <ClCompile>
       <AdditionalIncludeDirectories>C:\Program Files (x86)\Microsoft Visual Studio\2019\Community\Common7\IDE\VC\Linux\include\usr\Centos7_include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
+    <Link>
+      <AdditionalOptions>-pthread %(AdditionalOptions)</AdditionalOptions>
+    </Link>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|ARM'">
     <Link>
       <AdditionalOptions>-pthread %(AdditionalOptions)</AdditionalOptions>
     </Link>
