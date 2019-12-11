@@ -34,7 +34,7 @@ const CSerialThread::BAUDRATE_CONV_TABLE g_tBaudrateConv[] =
 	{ 3000000,   B3000000,   "3000000" },
 	{ 3500000,   B3500000,   "3500000" },
 	{ 4000000,   B4000000,   "4000000" },
-	{      -1,		B9600,     "96000" },	// < default >
+	{      -1,		B9600,      "9600" },	// < default >
 };
 
 
@@ -79,11 +79,9 @@ CSerialThread::CSerialThread(CSerialThread::CLASS_PARAM_TABLE& tClassParam)
 	m_ErrorNo = 0;
 	m_epfd = -1;
 	m_pcSerialRecvThread = NULL;
-
-	// シリアル通信設定情報取得
 	m_SerialFd = -1;
 	memset(&m_tSerialConfInfo, 0x00, sizeof(m_tSerialConfInfo));
-	GetSerialConfInfo();
+
 
 	// クラスパラメータを保持
 	m_tClassParam = tClassParam;
@@ -103,6 +101,9 @@ CSerialThread::CSerialThread(CSerialThread::CLASS_PARAM_TABLE& tClassParam)
 #endif	// #ifdef _CSERIAL_THREAD_DEBUG_
 		return;
 	}
+
+	// シリアル通信設定情報取得
+	GetSerialConfInfo();
 
 	// IRQシリアル通信データ要求リストクリア
 	ClearIrqSerialDataList();
@@ -204,12 +205,25 @@ CSerialThread::RESULT_ENUM CSerialThread::Start()
 		return RESULT_ERROR_SYSTEM;
 	}
 
+	// シリアル通信受信スレッド開始
+	CSerialRecvThread::RESULT_ENUM eSerialTecvThread = m_pcSerialRecvThread->Start();
+	if (eSerialTecvThread != CSerialRecvThread::RESULT_SUCCESS)
+	{
+		if (m_pcSerialRecvThread != NULL)
+		{
+			delete m_pcSerialRecvThread;
+			m_pcSerialRecvThread = NULL;
+		}
+		Close();
+	}
+
 	// クライアント接続監視スレッド開始
 	eThreadRet = CThread::Start();
 	if (eThreadRet != CThread::RESULT_SUCCESS)
 	{
 		if (m_pcSerialRecvThread != NULL)
 		{
+			m_pcSerialRecvThread->Stop();
 			delete m_pcSerialRecvThread;
 			m_pcSerialRecvThread = NULL;
 		}
@@ -261,6 +275,7 @@ CSerialThread::RESULT_ENUM CSerialThread::Stop()
 	// シリアル受信通信スレッド停止
 	if (m_pcSerialRecvThread != NULL)
 	{
+		m_pcSerialRecvThread->Stop();
 		delete m_pcSerialRecvThread;
 		m_pcSerialRecvThread = NULL;
 	}
@@ -302,6 +317,7 @@ void CSerialThread::GetSerialConfInfo(void)
 
 	// ボーレート
 	strValue = "";
+
 	m_tClassParam.pcConfFile->GetValue("Serial", "Baudrate", strValue);
 	if (strValue.length() != 0)
 	{
@@ -320,6 +336,7 @@ void CSerialThread::GetSerialConfInfo(void)
 			m_tSerialConfInfo.tBaudRate = g_tBaudrateConv[i];
 			break;
 		}
+		i++;
 	}
 
 	// データ長
@@ -342,6 +359,7 @@ void CSerialThread::GetSerialConfInfo(void)
 			m_tSerialConfInfo.tDataSize = g_tDataSizeConv[i];
 			break;
 		}
+		i++;
 	}
 
 	// ストップビット
@@ -364,6 +382,7 @@ void CSerialThread::GetSerialConfInfo(void)
 			m_tSerialConfInfo.tStopBit = g_tStopBitConv[i];
 			break;
 		}
+		i++;
 	}
 
 	// パリティビット
@@ -386,6 +405,7 @@ void CSerialThread::GetSerialConfInfo(void)
 			m_tSerialConfInfo.tParity = g_ParityConv[i];
 			break;
 		}
+		i++;
 	}
 
 	m_tClassParam.pcLog->Output(CLog::LOG_OUTPUT_ERROR, "-----[ SerialConfInfo ]-----");
@@ -461,14 +481,17 @@ CSerialThread::RESULT_ENUM CSerialThread::Open(SERIAL_CONF_TABLE& tSerialConfInf
 	tNewtio.c_iflag |= ICRNL;											// ICRNL：受信したcarriage returnを改行に変換
 	
 	// ---< 出力モード >---
-	tNewtio.c_oflag = OCRNL;											// OCRNL：出力されるcarrige returnを改行に変換
+//	tNewtio.c_oflag = OCRNL;											// OCRNL：出力されるcarrige returnを改行に変換
+	tNewtio.c_oflag = 0;
 
 	// ---< 制御モード >---
-	tNewtio.c_cflag = CREAD;											// CREAD：文字の受信を可能にする
+	tNewtio.c_cflag = CREAD | CLOCAL;									// CREAD：文字の受信を可能にする
+	tNewtio.c_cflag |= m_tSerialConfInfo.tBaudRate.BaureateDefine;		//      ：ボーレート
 	tNewtio.c_cflag |= m_tSerialConfInfo.tDataSize.DataSizeDefine;		//      ：送受信文字サイズ
 	tNewtio.c_cflag |= m_tSerialConfInfo.tStopBit.StopBitDefine;		//      ：ストップビット
 	tNewtio.c_cflag |= m_tSerialConfInfo.tParity.ParityDefine;			//      ：パリティ
-	
+//	tNewtio.c_lflag |= ICANON;
+
 	iRet = tcsetattr(m_SerialFd, TCSANOW, &tNewtio);
 	if (iRet < 0)
 	{
@@ -688,7 +711,7 @@ bSendData = true;
 			m_cSerialDataListMutex.Lock();
 
 			// シリアル送信データリストに送信データがあるか調べる
-			SendDataNum = m_IrqSerialDataList.size();
+			SendDataNum = m_SerialDataList.size();
 			if (SendDataNum != 0)
 			{
 				// リストの先頭データを取り出す
@@ -805,6 +828,8 @@ CSerialThread::RESULT_ENUM CSerialThread::SetIrqSerialDataList(SERIAL_DATA_TABLE
 	m_cIrqSerialDataListMutex.Unlock();
 	// ▲△▲△▲△▲△▲△▲△▲△▲△▲△▲△▲△▲△▲△▲△▲
 
+	m_cSerialDataEvent.SetEvent();
+
 	return RESULT_SUCCESS;
 }
 
@@ -883,6 +908,8 @@ CSerialThread::RESULT_ENUM CSerialThread::SetSerialDataList(SERIAL_DATA_TABLE& t
 
 	m_cSerialDataListMutex.Unlock();
 	// ▲△▲△▲△▲△▲△▲△▲△▲△▲△▲△▲△▲△▲△▲△▲
+
+	m_cSerialDataEvent.SetEvent();
 
 	return RESULT_SUCCESS;
 }
