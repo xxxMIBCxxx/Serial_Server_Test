@@ -15,43 +15,38 @@
 CConfFile::CConfFile(const char *pszFilePath)
 {
 	bool			bRet = false;
+	char			szProcessName[64 + 1];
+	char			szFilePath[256 + 1];
 
+
+	memset(szProcessName, 0x00, sizeof(szProcessName));
+	memset(szFilePath, 0x00, sizeof(szFilePath));
 
 	m_bInitFlag = false;
-	m_pFile = NULL;
-	m_tConfigList.clear();
+	m_strFilePath = "";
+	m_tLineList.clear();
+
+	// 行リストをクリア
+	m_tLineList.clear();
+
+	// セクション情報リストをクリア
+	Clear_SectionInfoList();
 
 	// パラメータチェック
 	if (pszFilePath == NULL)
 	{
-		char				szProcessName[64 + 1];
-		char				szFilePath[256 + 1];
-		memset(szProcessName, 0x00, sizeof(szProcessName));
-		memset(szFilePath, 0x00, sizeof(szFilePath));
 		GetProcessName(szProcessName, 64);
 		sprintf(szFilePath,"/etc/%s.conf", szProcessName);
+	}
+	m_strFilePath = pszFilePath;
 
-		// ファイルチェック
-		m_pFile = fopen(szFilePath, "r");
-	}
-	else
-	{
-		// ファイルチェック
-		m_pFile = fopen(pszFilePath, "r");
-	}
-	if (m_pFile == NULL)
-	{
-		m_ErrorNo = errno;
-#ifdef _CCONF_FILE_DEBUG_
-		perror("CConfFile::CConfFile - fopen");
-#endif	// #ifdef _CCONF_FILE_DEBUG_
-		return;
-	}
-
-	// 設定リスト作成
-	bRet = CreateConfigList(m_pFile, m_tConfigList);
+	// 設定ファイルの読み込み
+	bRet = ReadConfFile(m_strFilePath.c_str());
 	if (bRet == false)
 	{
+#ifdef _CCONF_FILE_DEBUG_
+		printf("CConfFile::CConfFile - ReadConfFile Error.");
+#endif	// #ifdef _CCONF_FILE_DEBUG_
 		return;
 	}
 
@@ -64,24 +59,22 @@ CConfFile::CConfFile(const char *pszFilePath)
 //-----------------------------------------------------------------------------
 CConfFile::~CConfFile()
 {
-	// ファイルクローズ
-	if (m_pFile != NULL)
-	{
-		fclose(m_pFile);
-		m_pFile = NULL;
-	}
+	// 行リストをクリア
+	m_tLineList.clear();
 
-	// 設定リスト破棄
-	m_tConfigList.clear();
+	// セクション情報リストをクリア
+	Clear_SectionInfoList();
 }
 
 
+
 //-----------------------------------------------------------------------------
-// 設定リスト作成
-// ⇒指定されたファイルから設定リストを作成する
+// 設定ファイルの行リスト作成
+// ⇒指定されたファイルから行リストを作成する
 //-----------------------------------------------------------------------------
-bool CConfFile::CreateConfigList(FILE* pFile, std::list<CONFFILE_INFO_TABLE>& tConfigList)
+bool CConfFile::CreateLineList(FILE* pFile)
 {
+	bool			bRet = false;
 	bool			bSection = false;
 	bool			bValue = false;
 	std::string		strTempSection;
@@ -89,15 +82,20 @@ bool CConfFile::CreateConfigList(FILE* pFile, std::list<CONFFILE_INFO_TABLE>& tC
 	std::string		strKey;
 	std::string		strValue;
 	char			szBuff[TEMP_BUFF_SIZE + 1];
-	char*			pPos = NULL;
 
 
-	// リストをクリア
-	tConfigList.clear();
+	// 行リストをクリア
+	m_tLineList.clear();
+	
+	// セクション情報リストをクリア
+	Clear_SectionInfoList();
 
 	// パラメータチェック
 	if (pFile == NULL)
 	{
+#ifdef _CCONF_FILE_DEBUG_
+		printf("CConfFile::CreateLineList - Param Error.");
+#endif	// #ifdef _CCONF_FILE_DEBUG_
 		return false;
 	}
 	fseek(pFile, SEEK_SET, 0);
@@ -105,42 +103,240 @@ bool CConfFile::CreateConfigList(FILE* pFile, std::list<CONFFILE_INFO_TABLE>& tC
 	// EOFまで1行ずつ読み込む
 	while (fgets(szBuff, TEMP_BUFF_SIZE, pFile) != NULL)
 	{
-		// コメント('#')文字の部分をNULL文字に変換
-		pPos = strstr(szBuff, "#");
-		if (pPos != NULL)
-		{
-			*pPos = '\0';
-		}
-
+		LINE_INFO_TABLE			tTempLineInfo;
+		tTempLineInfo.eLineKind = LINE_KIND_COMMENT;
+		tTempLineInfo.strBuff = szBuff;
 		Trim(szBuff);
-	
-		// セクション行か調べる
-		bSection = SectionCheck(szBuff, strTempSection);
-		if (bSection == true)
+
+		// 行の1文字目が'#' or ';'の場合コメント行とする
+		if ((szBuff[0] == '#') || (szBuff[0] == ';'))
 		{
-			strSection = strTempSection;
+			tTempLineInfo.eLineKind = LINE_KIND_COMMENT;
+		}
+		// 何も記載していない場合もコメント行にする
+		else if (strlen(szBuff) == 0)
+		{
+			tTempLineInfo.eLineKind = LINE_KIND_COMMENT;
 		}
 		else
 		{
-			if (strSection.length() != 0)
+			// セクション行か調べる
+			bSection = SectionCheck(szBuff, strTempSection);
+			if (bSection == true)
 			{
-				// 設定行か調べる
-				bValue = ValueCheck(szBuff, strKey, strValue);
-				if (bValue == true)
+				tTempLineInfo.eLineKind = LINE_KIND_SECTION;
+				strSection = strTempSection;
+			}
+			else
+			{
+				if (strSection.length() != 0)
 				{
-					CONFFILE_INFO_TABLE			tTempConfig;
-					tTempConfig.strSection = strSection;
-					tTempConfig.strKey = strKey;
-					tTempConfig.strValue = strValue;
+					// 設定行か調べる
+					bValue = ValueCheck(szBuff, strKey, strValue);
+					if (bValue == true)
+					{
+						tTempLineInfo.eLineKind = LINE_KIND_KEY;
 
-					// リストに登録
-					tConfigList.push_back(tTempConfig);
+						// セクション情報リストに設定情報を追加
+						KEY_INFO_TABLE			tKeyInfo;
+						tKeyInfo.LineNo = m_tLineList.size();
+						tKeyInfo.strSection = strSection;
+						tKeyInfo.strKey = strKey;
+						tKeyInfo.strValue = strValue;
+						bRet = Add_SectionInfo(tKeyInfo);
+						if (bRet == false)
+						{
+#ifdef _CCONF_FILE_DEBUG_
+							printf("Add_SectionInfo Error. [LineNo:%lu, Section:%s, Key:%s, Value:%s]\n", tKeyInfo.LineNo, tKeyInfo.strSection.c_str(), tKeyInfo.strKey.c_str(), tKeyInfo.strValue.c_str());
+#endif	// #ifdef _CCONF_FILE_DEBUG_
+							// ※エラーでも処理を継続させる
+						}
+					}
 				}
 			}
 		}
+
+		// リスト行に登録
+		m_tLineList.push_back(tTempLineInfo);
 	}
 
 	return true;
+}
+
+
+//-----------------------------------------------------------------------------
+// セクション情報リストに設定情報を追加
+//-----------------------------------------------------------------------------
+bool CConfFile::Add_SectionInfo(KEY_INFO_TABLE& tKeyInfo)
+{
+	SECTION_INFO_TABLE						tSectionInfo;
+	std::list<SECTION_INFO_TABLE>::iterator	it_SectionInfo;
+	std::list<KEY_INFO_TABLE>::iterator		it_KeyInfo;
+
+
+	// セクション情報リストにセクションが既に登録されているか探す
+	it_SectionInfo = m_tSectionInfoList.begin();
+	while (it_SectionInfo != m_tSectionInfoList.end())
+	{
+		if (it_SectionInfo->strSection == tKeyInfo.strSection)
+		{
+			// 設定項目を探す
+			it_KeyInfo = it_SectionInfo->tKeyInfoList.begin();
+			while (it_KeyInfo != it_SectionInfo->tKeyInfoList.end())
+			{
+				// 既に登録済み
+				if (it_KeyInfo->strKey == tKeyInfo.strKey)
+				{
+					return false;
+				}
+				it_KeyInfo++;
+			}
+
+			// 設定項目が見つからなかったので、設定項目を追加
+			it_SectionInfo->tKeyInfoList.push_back(tKeyInfo);
+			return true;
+		}
+		it_SectionInfo++;
+	}
+
+	// セクションが見つからなかった場合、新しいセクションとして追加
+	tSectionInfo.strSection = tKeyInfo.strSection;
+	tSectionInfo.tKeyInfoList.push_back(tKeyInfo);
+	m_tSectionInfoList.push_back(tSectionInfo);
+
+	return true;
+}
+
+
+//-----------------------------------------------------------------------------
+// セクション情報リストをもとに、行リストに設定項目をセットする
+//-----------------------------------------------------------------------------
+bool CConfFile::Set_SectionInfo(KEY_INFO_TABLE& tKeyInfo)
+{
+	SECTION_INFO_TABLE						tSectionInfo;
+	std::list<SECTION_INFO_TABLE>::iterator	it_SectionInfo;
+	std::list<KEY_INFO_TABLE>::iterator		it_KeyInfo;
+	unsigned long							LineNo = 0;
+
+
+	// セクション情報リストにセクションが既に登録されているか探す
+	it_SectionInfo = m_tSectionInfoList.begin();
+	while (it_SectionInfo != m_tSectionInfoList.end())
+	{
+		if (it_SectionInfo->strSection == tKeyInfo.strSection)
+		{
+			// 設定項目を探す
+			it_KeyInfo = it_SectionInfo->tKeyInfoList.begin();
+			while (it_KeyInfo != it_SectionInfo->tKeyInfoList.end())
+			{
+				// 既に登録済み
+				if (it_KeyInfo->strKey == tKeyInfo.strKey)
+				{
+					// 行リストの設定情報を変更
+					tKeyInfo.LineNo = it_KeyInfo->LineNo;
+					Set_LineInfo(tKeyInfo);
+					return true;
+				}
+				// 行数を保持
+				LineNo = it_KeyInfo->LineNo;
+				it_KeyInfo++;
+			}
+
+			// 行リストに設定情報を追加	
+			tKeyInfo.LineNo = LineNo + 1;
+			Insert_LineInfo(tKeyInfo);
+			return true;
+		}
+		it_SectionInfo++;
+	}
+
+	// 行リストにセクション・設定情報を追加
+	Set_SectionInfoList(tKeyInfo);
+
+	return true;
+}
+
+
+//-----------------------------------------------------------------------------
+// 行リストの設定情報を変更
+//-----------------------------------------------------------------------------
+void CConfFile::Insert_LineInfo(KEY_INFO_TABLE& tKeyInfo)
+{
+	std::list<LINE_INFO_TABLE>::iterator	it_listinfo;
+	LINE_INFO_TABLE							tLineInfo;
+	unsigned long							LineNo = tKeyInfo.LineNo;
+
+
+	// 挿入する行までループ
+	it_listinfo = m_tLineList.begin();
+	for (unsigned long i = 0; i < LineNo; i++)
+	{
+		it_listinfo++;
+	}
+	tLineInfo.eLineKind = LINE_KIND_KEY;
+	tLineInfo.strBuff = tKeyInfo.strKey + " = " + tKeyInfo.strValue + "\n";
+	it_listinfo = m_tLineList.insert(it_listinfo, tLineInfo);
+}
+
+
+//-----------------------------------------------------------------------------
+// 行リストに設定情報を追加
+//-----------------------------------------------------------------------------
+void CConfFile::Set_LineInfo(KEY_INFO_TABLE& tKeyInfo)
+{
+	std::list<LINE_INFO_TABLE>::iterator	it_listinfo;
+	unsigned long							LineNo = tKeyInfo.LineNo;
+
+
+	// 内容を変更する行までループ
+	it_listinfo = m_tLineList.begin();
+	for (unsigned long i = 0; i < LineNo; i++)
+	{
+		it_listinfo++;
+	}
+
+	// 行の内容を変更
+	it_listinfo->strBuff = tKeyInfo.strKey + " = " + tKeyInfo.strValue + "\n";
+}
+
+
+//-----------------------------------------------------------------------------
+// 行リストにセクション・設定情報を追加
+//-----------------------------------------------------------------------------
+void CConfFile::Set_SectionInfoList(KEY_INFO_TABLE& tKeyInfo)
+{
+	LINE_INFO_TABLE							tLineInfo;
+
+
+	// 行リストの最後にセクション・設定情報を追加
+	tLineInfo.eLineKind = LINE_KIND_SECTION;
+	tLineInfo.strBuff = "[" + tKeyInfo.strSection + "]\n";
+	m_tLineList.push_back(tLineInfo);
+
+	tLineInfo.eLineKind = LINE_KIND_KEY;
+	tLineInfo.strBuff = tKeyInfo.strKey + " = " + tKeyInfo.strValue + "\n";
+	m_tLineList.push_back(tLineInfo);
+}
+
+
+//-----------------------------------------------------------------------------
+// セクション情報リストをクリア
+//-----------------------------------------------------------------------------
+void CConfFile::Clear_SectionInfoList()
+{
+	if (m_tSectionInfoList.size() != 0)
+	{
+		std::list< SECTION_INFO_TABLE>::iterator		it = m_tSectionInfoList.begin();
+		while (it != m_tSectionInfoList.end())
+		{
+			// 設定情報リストクリア
+			it->tKeyInfoList.clear();
+			it++;
+		}
+	}
+
+	// セクション情報リストクリア
+	m_tSectionInfoList.clear();
 }
 
 
@@ -160,6 +356,9 @@ bool CConfFile::SectionCheck(char* pszString, std::string& strSection)
 	// パラメータチェック
 	if (pszString == NULL)
 	{
+#ifdef _CCONF_FILE_DEBUG_
+		printf("CConfFile::SectionCheck - Param Error. [pszString:NULL]");
+#endif	// #ifdef _CCONF_FILE_DEBUG_
 		return false;
 	}
 
@@ -214,6 +413,9 @@ bool CConfFile::ValueCheck(char* pszString, std::string& strKey, std::string& st
 	// パラメータチェック
 	if (pszString == NULL)
 	{
+#ifdef _CCONF_FILE_DEBUG_
+		printf("CConfFile::ValueCheck - Param Error. [pszString:NULL]");
+#endif	// #ifdef _CCONF_FILE_DEBUG_
 		return false;
 	}
 
@@ -262,43 +464,219 @@ bool CConfFile::ValueCheck(char* pszString, std::string& strKey, std::string& st
 //-----------------------------------------------------------------------------
 bool CConfFile::GetValue(const char* pszSection, const char* pszKey, std::string& strValue)
 {
-	bool						bFind = false;
-	CONFFILE_INFO_TABLE			tTempConfig;
+	bool										bFind = false;
+	SECTION_INFO_TABLE							tSectionInfo;
+	std::list<SECTION_INFO_TABLE>::iterator		it;
+	std::list<KEY_INFO_TABLE>::iterator			it2;
 
 
 	// 引数チェック
 	if (pszSection == NULL)
 	{
+#ifdef _CCONF_FILE_DEBUG_
+		printf("CConfFile::GetValue - Param Error. [pszSection:NULL]");
+#endif	// #ifdef _CCONF_FILE_DEBUG_
 		return false;
 	}
 
 	if (pszKey == NULL)
 	{
+#ifdef _CCONF_FILE_DEBUG_
+		printf("CConfFile::GetValue - Param Error. [pszKey:NULL]");
+#endif	// #ifdef _CCONF_FILE_DEBUG_
 		return false;
 	}
 
-	if (m_tConfigList.size() == 0)
+	if (m_tSectionInfoList.size() == 0)
 	{
 		return false;
 	}
 
+	// セクション情報リストからセクションを探す
 	bFind = false;
-	std::list<CONFFILE_INFO_TABLE>::iterator it = m_tConfigList.begin();
-	while (it != m_tConfigList.end())
+	it = m_tSectionInfoList.begin();
+	while (it != m_tSectionInfoList.end())
 	{
-		tTempConfig = *it;
-
-		// セクションとキーが一致した場合
-		if ((strcmp(tTempConfig.strSection.c_str(), pszSection) == 0) && (strcmp(tTempConfig.strKey.c_str(), pszKey) == 0))
+		if (it->strSection.compare(pszSection) == 0)
 		{
-			bFind = true;
-			strValue = tTempConfig.strValue;
-			break;
+			// 設定情報から設定項目を探す
+			it2 = it->tKeyInfoList.begin();
+			while (it2 != it->tKeyInfoList.end())
+			{
+				if (it2->strKey.compare(pszKey) == 0)
+				{
+					strValue = it2->strValue;
+					bFind = true;
+					break;
+				}
+				it2++;
+			}
+
+			if (bFind == true)
+			{
+				break;
+			}
 		}
 		it++;
 	}
 
 	return bFind;
+}
+
+
+//-----------------------------------------------------------------------------
+// 設定値の設定
+//-----------------------------------------------------------------------------
+bool CConfFile::SetValue(const char* pszSection, const char* pszKey, const char* pszValue)
+{
+	bool			bRet = false;
+
+
+	// 引数チェック
+	if (pszSection == NULL)
+	{
+#ifdef _CCONF_FILE_DEBUG_
+		printf("CConfFile::SetValue - Param Error. [pszSection:NULL]");
+#endif	// #ifdef _CCONF_FILE_DEBUG_
+		return false;
+	}
+
+	if (pszKey == NULL)
+	{
+#ifdef _CCONF_FILE_DEBUG_
+		printf("CConfFile::SetValue - Param Error. [pszKey:NULL]");
+#endif	// #ifdef _CCONF_FILE_DEBUG_
+		return false;
+	}
+
+	if (pszValue == NULL)
+	{
+#ifdef _CCONF_FILE_DEBUG_
+		printf("CConfFile::SetValue - Param Error. [pszValue:NULL]");
+#endif	// #ifdef _CCONF_FILE_DEBUG_
+		return false;
+	}
+
+	// セクション情報リストに設定情報を追加
+	KEY_INFO_TABLE			tKeyInfo;
+	tKeyInfo.LineNo = m_tLineList.size();
+	tKeyInfo.strSection = pszSection;
+	tKeyInfo.strKey = pszKey;
+	tKeyInfo.strValue = pszValue;
+	bRet = Set_SectionInfo(tKeyInfo);
+	if (bRet == false)
+	{
+		return false;
+	}
+
+	// 設定ファイル作成
+	bRet = CreateConfFile(m_strFilePath.c_str());
+	if (bRet == false)
+	{
+#ifdef _CCONF_FILE_DEBUG_
+		printf("CConfFile::SetValue - CreateConfFile Error.");
+#endif	// #ifdef _CCONF_FILE_DEBUG_
+		return false;
+	}
+
+	// 設定ファイル読込
+	bRet = ReadConfFile(m_strFilePath.c_str());
+	if (bRet == false)
+	{
+#ifdef _CCONF_FILE_DEBUG_
+		printf("CConfFile::SetValue - ReadConfFile Error.");
+#endif	// #ifdef _CCONF_FILE_DEBUG_
+		return false;
+	}
+
+	return true;
+}
+
+
+//-----------------------------------------------------------------------------
+// 設定ファイル作成
+//-----------------------------------------------------------------------------
+bool CConfFile::CreateConfFile(const char* pszFilePath)
+{
+	FILE*									pFile = NULL;
+	std::list<LINE_INFO_TABLE>::iterator	it_ListInfo;
+
+
+	// 引数チェック
+	if (pszFilePath == NULL)
+	{
+#ifdef _CCONF_FILE_DEBUG_
+		printf("CConfFile::CreateConfFile - Param Error. [pszFilePath:NULL]");
+#endif	// #ifdef _CCONF_FILE_DEBUG_
+		return false;
+	}
+
+	// ファイルオープン
+	pFile = fopen(pszFilePath, "w+");
+	if (pFile == NULL)
+	{
+		m_ErrorNo = errno;
+#ifdef _CCONF_FILE_DEBUG_
+		perror("CConfFile::CreateConfFile - fopen.");
+#endif	// #ifdef _CCONF_FILE_DEBUG_		
+		return false;
+	}
+
+	// 行リストを使用して、設定ファイルを書き込み
+	it_ListInfo = m_tLineList.begin();
+	while (it_ListInfo != m_tLineList.end())
+	{
+		fputs(it_ListInfo->strBuff.c_str(), pFile);
+		it_ListInfo++;
+	}
+	fclose(pFile);
+
+	return true;
+}
+
+
+//-----------------------------------------------------------------------------
+// 設定ファイル読込
+//-----------------------------------------------------------------------------
+bool CConfFile::ReadConfFile(const char *pszFilePath)
+{
+	bool			bRet = false;
+	FILE*			pFile = NULL;
+
+	
+	// 引数チェック
+	if (pszFilePath == NULL)
+	{
+#ifdef _CCONF_FILE_DEBUG_
+		printf("CConfFile::ReadConfFile - Param Error. [pszFilePath:NULL]");
+#endif	// #ifdef _CCONF_FILE_DEBUG_
+		return false;
+	}
+
+	// ファイルオープン
+	pFile = fopen(pszFilePath, "r");
+	if (pFile == NULL)
+	{
+		m_ErrorNo = errno;
+#ifdef _CCONF_FILE_DEBUG_
+		perror("CConfFile::ReadConfFile - fopen.");
+#endif	// #ifdef _CCONF_FILE_DEBUG_
+		return false;
+	}
+
+	// 行リスト作成
+	bRet = CreateLineList(pFile);
+	if (bRet == false)
+	{
+#ifdef _CCONF_FILE_DEBUG_
+		printf("CConfFile::ReadConfFile - CreateLineList Error.");
+#endif	// #ifdef _CCONF_FILE_DEBUG_
+		fclose(pFile);
+		return false;
+	}
+	fclose(pFile);
+
+	return true;
 }
 
 
