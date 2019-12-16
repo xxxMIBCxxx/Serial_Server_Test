@@ -68,7 +68,6 @@ CLog::~CLog()
 //-----------------------------------------------------------------------------
 bool CLog::Start()
 {
-	bool					bRet = false;
 	FILE*					pFile = NULL;
 	CThread::RESULT_ENUM	eThreadRet = CThread::RESULT_SUCCESS;
 
@@ -185,7 +184,6 @@ void CLog::ThreadProc()
 	struct epoll_event			tEvent;
 	struct epoll_event			tEvents[EPOLL_MAX_EVENTS];
 	bool						bLoop = true;
-	ssize_t						ReadNum = 0;
 
 
 	// スレッドが終了する際に呼ばれる関数を登録

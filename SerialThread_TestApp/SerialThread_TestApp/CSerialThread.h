@@ -10,6 +10,7 @@
 #include "CMutex.h"
 #include "list"
 #include "CSerialRecvThread.h"
+#include "ResultHeader.h"
 
 
 #define	SERIAL_DEVICE_NAME						( 64 )
@@ -18,25 +19,6 @@
 class CSerialThread : public CThread
 {
 public:
-	
-	// シリアルスレッドクラスの結果種別
-	typedef enum
-	{
-		RESULT_SUCCESS = 0x00000000,											// 正常終了
-		RESULT_ERROR_INIT = 0xE00000001,										// 初期処理に失敗している
-		RESULT_ERROR_ALREADY_STARTED = 0xE00000002,								// 既にスレッドを開始している
-		RESULT_ERROR_START = 0xE00000003,										// スレッド開始に失敗しました
-
-		RESULT_ERROR_ALREADY_SERIAL_OPEN = 0xE0000004,							// 既にシリアルオープンしている
-		RESULT_ERROR_SERIAL_OPEN = 0xE0000005,									// シリアルオープンに失敗しました
-		RESULT_ERROR_SERIAL_SET_ATTRIBUTE = 0xE0000006,							// シリアルの属性設定に失敗しました
-		RESULT_ERROR_SERIAL_SET_BAUDRATE = 0xE0000007,							// シリアルのボーレート設定に失敗しました
-		RESULT_ERROR_THREAD_NOT_ACTIVE = 0xE0000008,							// スレッドが動作していない
-
-		RESULT_ERROR_SYSTEM = 0xE9999999,										// システムエラー
-	} RESULT_ENUM;
-
-
 	// シリアルスレッドクラスのパラメータ
 	typedef struct
 	{
@@ -129,20 +111,20 @@ private:
 
 public:
 	CSerialThread(CLASS_PARAM_TABLE &tClassParam);
-	~CSerialThread();
+	virtual ~CSerialThread();
 
-	RESULT_ENUM Start();
-	RESULT_ENUM Stop();
-	RESULT_ENUM SetIrqSerialDataList(SERIAL_DATA_TABLE& tSerialData);
-	RESULT_ENUM SetSerialDataList(SERIAL_DATA_TABLE& tSerialData);
+	RESULT_HEADER_ENUM Start();
+	RESULT_HEADER_ENUM Stop();
+	RESULT_HEADER_ENUM SetIrqSerialDataList(SERIAL_DATA_TABLE& tSerialData);
+	RESULT_HEADER_ENUM SetSerialDataList(SERIAL_DATA_TABLE& tSerialData);
 
 
 private:
 	void ThreadProc();
 	static void ThreadProcCleanup(void* pArg);
 	void GetSerialConfInfo(void);
-	RESULT_ENUM Open(SERIAL_CONF_TABLE& tSerialConfInfo);
-	RESULT_ENUM Close(void);
+	RESULT_HEADER_ENUM Open(SERIAL_CONF_TABLE& tSerialConfInfo);
+	RESULT_HEADER_ENUM Close(void);
 	bool SerialSendProc(int* pEpfd, struct epoll_event* ptEvents, int MaxEvents, int Timeout);
 	void ClearIrqSerialDataList(void);
 	void ClearSerialDataList(void);

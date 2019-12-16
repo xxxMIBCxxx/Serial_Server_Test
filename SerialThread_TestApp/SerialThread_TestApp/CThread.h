@@ -37,6 +37,7 @@ private:
 	std::string						m_strId;				// 識別名
 	bool							m_bInitFlag;			// 初期化フラグ
 	int								m_ErrorNo;				// エラー番号
+//	int								m_epfd;					// epollファイルディスクリプタ
 
 	pthread_t						m_hThread;				// スレッドハンドル
 
@@ -47,7 +48,7 @@ public:
 
 public:
 	CThread(const char* pszId = NULL);
-	~CThread();
+	virtual ~CThread();
 	CThread::RESULT_ENUM Start();
 	CThread::RESULT_ENUM Stop();
 	int GetErrorNo();
@@ -59,6 +60,6 @@ public:
 
 private:
 	static void* ThreadLauncher(void* pUserData);
-
+//	static void ThreadProcCleanup(void* pArg);
 };
 

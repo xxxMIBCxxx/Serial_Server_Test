@@ -2,6 +2,7 @@
 // Threadクラス
 // ※リンカオプションに「-pthread」を追加すること
 //*****************************************************************************
+#include "CThread.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <time.h>
@@ -9,12 +10,13 @@
 #include <fcntl.h>
 #include <unistd.h>
 #include <pthread.h>
-#include "CThread.h"
+#include <sys/epoll.h>
 
 
 #define _CTHREAD_DEBUG_
 #define	CTHREAD_START_TIMEOUT				( 3 * 1000 )			// スレッド開始待ちタイムアウト(ms)
 #define	CTHREAD_END_TIMEOUT					( 3 * 1000 )			// スレッド終了待ちタイムアウト(ms)
+#define EPOLL_MAX_EVENTS					( 10 )					// epoll最大イベント
 
 
 //-----------------------------------------------------------------------------
@@ -22,7 +24,6 @@
 //-----------------------------------------------------------------------------
 CThread::CThread(const char* pszId)
 {
-	int							iRet = 0;
 	CEvent::RESULT_ENUM			eRet = CEvent::RESULT_SUCCESS;
 
 
@@ -30,6 +31,7 @@ CThread::CThread(const char* pszId)
 	m_bInitFlag = false;
 	m_ErrorNo = 0;
 	m_hThread = 0;
+//	m_epfd = -1;
 	
 	// クラス名を保持
 	if (pszId != NULL)
@@ -262,42 +264,120 @@ void* CThread::ThreadLauncher(void* pUserData)
 //-----------------------------------------------------------------------------
 void CThread::ThreadProc()
 {
-	CEvent::RESULT_ENUM			eEventRet = CEvent::RESULT_SUCCESS;
-	unsigned int				Count = 1;
-	unsigned int				Timeout = 0;
-	bool						bLoop = true;
-
-
-	// スレッド開始イベントを送信
-	m_cThreadStartEvent.SetEvent();
-	printf("-- Thread %s Start --\n", m_strId.c_str());
-
-	// pthread_testcancelが呼ばれるまで処理を続ける
-	while (bLoop)
-	{
-		// Sleep時間を生成
-		Timeout = ((rand() % 30) + 1) * 100;
-
-		// スレッド終了要求イベントが通知されるまで待つ
-		eEventRet = m_cThreadEndReqEvent.Wait(Timeout);
-		switch (eEventRet) {
-		case CEvent::RESULT_WAIT_TIMEOUT:
-			printf("[%s] Count : %lu \n", this->m_strId.c_str(), Count++);
-			break;
-
-		case CEvent::RESULT_RECIVE_EVENT:
-			m_cThreadEndReqEvent.ClearEvent();
-			bLoop = false;
-			break;
-
-		default:
-			printf("CEvent::Wait error. \n");
-			bLoop = false;
-			break;
-		}
-	}
-
-	// スレッド終了イベントを送信
-	m_cThreadEndEvent.SetEvent();
-	printf("-- Thread %s End --\n", m_strId.c_str());
+//	int							iRet = 0;
+//	struct epoll_event			tEvent;
+//	struct epoll_event			tEvents[EPOLL_MAX_EVENTS];
+//	bool						bLoop = true;
+//	struct tm					tTm;
+//	char						szTime[64 + 1];
+//	struct timespec				tTimeSpec;
+//
+//
+//	// スレッドが終了する際に呼ばれる関数を登録
+//	pthread_cleanup_push(ThreadProcCleanup, this);
+//
+//	// epollファイルディスクリプタ生成
+//	m_epfd = epoll_create(EPOLL_MAX_EVENTS);
+//	if (m_epfd == -1)
+//	{
+//		m_ErrorNo = errno;
+//#ifdef _CTHREAD_DEBUG_
+//		perror("CThread::ThreadProc - epoll_create");
+//#endif	// #ifdef _CTHREAD_DEBUG_
+//		return;
+//	}
+//
+//	// スレッド終了要求イベントを登録
+//	memset(&tEvent, 0x00, sizeof(tEvent));
+//	tEvent.events = EPOLLIN;
+//	tEvent.data.fd = this->GetThreadEndReqEventFd();
+//	iRet = epoll_ctl(m_epfd, EPOLL_CTL_ADD, this->GetThreadEndReqEventFd(), &tEvent);
+//	if (iRet == -1)
+//	{
+//		m_ErrorNo = errno;
+//#ifdef _CTHREAD_DEBUG_
+//		perror("CThread::ThreadProc - epoll_ctl[ThreadEndReqEvent]");
+//#endif	// #ifdef _CTHREAD_DEBUG_
+//		return;
+//	}
+//
+//#ifdef _CTHREAD_DEBUG_
+//	printf("-- Thread %s Start --\n", m_strId.c_str());
+//#endif	// #ifdef _CTHREAD_DEBUG_
+//	// スレッド開始イベントを送信
+//	m_cThreadStartEvent.SetEvent();
+//
+//	// ▼--------------------------------------------------------------------------▼
+//	// スレッド終了要求が来るまでループ
+//	// ※勝手にループを抜けるとスレッド終了時にタイムアウトで終了となるため、スレッド終了要求以外は勝手にループを抜けないでください
+//	while (bLoop)
+//	{
+//		memset(tEvents, 0x00, sizeof(tEvents));
+//		int nfds = epoll_wait(this->m_epfd, tEvents, EPOLL_MAX_EVENTS, 1000);
+//		if (nfds == -1)
+//		{
+//			m_ErrorNo = errno;
+//#ifdef _CTHREAD_DEBUG_
+//			perror("CThread::ThreadProc - epoll_wait");
+//#endif	// #ifdef _CTHREAD_DEBUG_
+//			bLoop = false;
+//			continue;
+//		}
+//		else if (nfds == 0)
+//		{
+//			// 現在時刻を取得
+//			memset(szTime, 0x00, sizeof(szTime));
+//			clock_gettime(CLOCK_REALTIME, &tTimeSpec);
+//			localtime_r(&tTimeSpec.tv_sec, &tTm);
+//			sprintf(szTime, "[%04d/%02d/%02d %02d:%02d:%02d.%03ld]",
+//				tTm.tm_year + 1900,
+//				tTm.tm_mon + 1,
+//				tTm.tm_mday,
+//				tTm.tm_hour,
+//				tTm.tm_min,
+//				tTm.tm_sec,
+//				tTimeSpec.tv_nsec / 1000000);
+//
+//#ifdef _CTHREAD_DEBUG_
+//			printf("%s : CThread::ThreadProc.\n", szTime);
+//#endif	// #ifdef _CTHREAD_DEBUG_
+//			continue;
+//		}
+//
+//		for (int i = 0; i < nfds; i++)
+//		{
+//			// スレッド終了要求イベント受信
+//			if (tEvents[i].data.fd == this->GetThreadEndReqEventFd())
+//			{
+//				bLoop = false;
+//				break;
+//			}
+//		}
+//	}
+//	// ▲--------------------------------------------------------------------------▲
+//
+//#ifdef _CTHREAD_DEBUG_
+//	printf("-- Thread %s End --\n", m_strId.c_str());
+//#endif	// #ifdef _CTHREAD_DEBUG_
+//	// スレッド終了イベントを送信
+//	m_cThreadEndEvent.SetEvent();
+//
+//	pthread_cleanup_pop(1);
 }
+
+
+////-----------------------------------------------------------------------------
+//// スレッド終了時に呼ばれる処理
+////-----------------------------------------------------------------------------
+//void CThread::ThreadProcCleanup(void* pArg)
+//{
+//	CThread* pcThread = (CThread*)pArg;
+//
+//
+//	// epollファイルディスクリプタ解放
+//	if (pcThread->m_epfd != -1)
+//	{
+//		close(pcThread->m_epfd);
+//		pcThread->m_epfd = -1;
+//	}
+//}

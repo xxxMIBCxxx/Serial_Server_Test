@@ -8,23 +8,12 @@
 #include "CConfFile.h"
 #include "CMutex.h"
 #include "list"
+#include "ResultHeader.h"
 
 
 class CSerialRecvThread : public CThread
 {
 public:
-	// シリアル受信スレッドクラスの結果種別
-	typedef enum
-	{
-		RESULT_SUCCESS = 0x00000000,											// 正常終了
-		RESULT_ERROR_INIT = 0xE00000001,										// 初期処理に失敗している
-		RESULT_ERROR_ALREADY_STARTED = 0xE00000002,								// 既にスレッドを開始している
-		RESULT_ERROR_START = 0xE00000003,										// スレッド開始に失敗しました
-
-		RESULT_ERROR_SYSTEM = 0xE9999999,										// システムエラー
-	} RESULT_ENUM;
-
-
 	// シリアル受信スレッドクラスのパラメータ
 	typedef struct
 	{
@@ -48,11 +37,11 @@ private:
 
 public:
 	CSerialRecvThread(CLASS_PARAM_TABLE& tClassParam);
-	~CSerialRecvThread();
+	virtual ~CSerialRecvThread();
 
 
-	RESULT_ENUM Start();
-	RESULT_ENUM Stop();
+	RESULT_HEADER_ENUM Start();
+	RESULT_HEADER_ENUM Stop();
 	
 private:	
 	void ThreadProc();

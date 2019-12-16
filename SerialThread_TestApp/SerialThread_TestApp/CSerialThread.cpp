@@ -151,10 +151,10 @@ CSerialThread::~CSerialThread()
 //-----------------------------------------------------------------------------
 // シリアル通信スレッド開始
 //-----------------------------------------------------------------------------
-CSerialThread::RESULT_ENUM CSerialThread::Start()
+RESULT_HEADER_ENUM CSerialThread::Start()
 {
 	bool						bRet = false;
-	RESULT_ENUM					eRet = RESULT_SUCCESS;
+	RESULT_HEADER_ENUM			eRet =  ::RESULT_SUCCESS;
 	CThread::RESULT_ENUM		eThreadRet = CThread::RESULT_SUCCESS;
 
 
@@ -165,7 +165,7 @@ CSerialThread::RESULT_ENUM CSerialThread::Start()
 #ifdef _CSERIAL_THREAD_DEBUG_
 		printf("CSerialThread::Start - Not InitProc.");
 #endif	// #ifdef _CSERIAL_THREAD_DEBUG_
-		return RESULT_ERROR_INIT;
+		return RESULT_CSERIAL_THREAD_ERROR_INIT;
 	}
 
 	// 既にスレッドが動作している場合
@@ -176,12 +176,12 @@ CSerialThread::RESULT_ENUM CSerialThread::Start()
 #ifdef _CSERIAL_THREAD_DEBUG_
 		printf("CSerialThread::Start - Thread is Active.");
 #endif	// #ifdef _CSERIAL_THREAD_DEBUG_
-		return RESULT_ERROR_ALREADY_STARTED;
+		return RESULT_CSERIAL_THREAD_ERROR_THREAD_ALREADY_STARTED;
 	}
 
 	// シリアルをオープン
 	eRet = Open(m_tSerialConfInfo);
-	if (eRet != RESULT_SUCCESS)
+	if (eRet != ::RESULT_SUCCESS)
 	{
 		m_tClassParam.pcLog->Output(CLog::LOG_OUTPUT_ERROR, "CSerialThread::Start - Open Error. [eRet:0x%08X]", eRet);
 #ifdef _CSERIAL_THREAD_DEBUG_
@@ -202,12 +202,12 @@ CSerialThread::RESULT_ENUM CSerialThread::Start()
 #ifdef _CSERIAL_THREAD_DEBUG_
 		printf("CSerialThread::Start - Create CSerialRecvThread Error.");
 #endif	// #ifdef _CSERIAL_THREAD_DEBUG_
-		return RESULT_ERROR_SYSTEM;
+		return RESULT_CSERIAL_THREAD_ERROR_SYSTEM;
 	}
 
 	// シリアル通信受信スレッド開始
-	CSerialRecvThread::RESULT_ENUM eSerialTecvThread = m_pcSerialRecvThread->Start();
-	if (eSerialTecvThread != CSerialRecvThread::RESULT_SUCCESS)
+	eRet = m_pcSerialRecvThread->Start();
+	if (eRet != ::RESULT_SUCCESS)
 	{
 		if (m_pcSerialRecvThread != NULL)
 		{
@@ -215,9 +215,10 @@ CSerialThread::RESULT_ENUM CSerialThread::Start()
 			m_pcSerialRecvThread = NULL;
 		}
 		Close();
+		return eRet;
 	}
 
-	// クライアント接続監視スレッド開始
+	// シリアルスレッド開始
 	eThreadRet = CThread::Start();
 	if (eThreadRet != CThread::RESULT_SUCCESS)
 	{
@@ -233,17 +234,17 @@ CSerialThread::RESULT_ENUM CSerialThread::Start()
 #ifdef _CSERIAL_THREAD_DEBUG_
 		perror("CSerialThread::Start - Start Error.");
 #endif	// #ifdef _CSERIAL_THREAD_DEBUG_
-		return (CSerialThread::RESULT_ENUM)eThreadRet;
+		return RESULT_CSERIAL_THREAD_ERROR_THREAD_START;
 	}
 
-	return RESULT_SUCCESS;
+	return ::RESULT_SUCCESS;
 }
 
 
 //-----------------------------------------------------------------------------
 // シリアル通信スレッド停止
 //-----------------------------------------------------------------------------
-CSerialThread::RESULT_ENUM CSerialThread::Stop()
+RESULT_HEADER_ENUM CSerialThread::Stop()
 {
 	bool						bRet = false;
 
@@ -255,7 +256,7 @@ CSerialThread::RESULT_ENUM CSerialThread::Stop()
 #ifdef _CSERIAL_THREAD_DEBUG_
 		printf("CSerialThread::Start - Not InitProc.");
 #endif	// #ifdef _CSERIAL_THREAD_DEBUG_
-		return RESULT_ERROR_INIT;
+		return RESULT_CSERIAL_THREAD_ERROR_INIT;
 	}
 
 	// 既にスレッドが停止している場合
@@ -266,7 +267,7 @@ CSerialThread::RESULT_ENUM CSerialThread::Stop()
 #ifdef _CSERIAL_THREAD_DEBUG_
 		printf("CSerialThread::Start - Thread is Active.");
 #endif	// #ifdef _CSERIAL_THREAD_DEBUG_
-		return RESULT_SUCCESS;
+		return ::RESULT_SUCCESS;
 	}
 
 	// シリアル通信スレッド停止
@@ -289,7 +290,7 @@ CSerialThread::RESULT_ENUM CSerialThread::Stop()
 	// シリアル通信データ要求リストクリア
 	ClearSerialDataList();
 
-	return RESULT_SUCCESS;
+	return ::RESULT_SUCCESS;
 }
 
 
@@ -420,7 +421,7 @@ void CSerialThread::GetSerialConfInfo(void)
 //-----------------------------------------------------------------------------
 // シリアルオープン
 //-----------------------------------------------------------------------------
-CSerialThread::RESULT_ENUM CSerialThread::Open(SERIAL_CONF_TABLE& tSerialConfInfo)
+RESULT_HEADER_ENUM CSerialThread::Open(SERIAL_CONF_TABLE& tSerialConfInfo)
 {
 	int						iRet = 0;
 	struct termios			tNewtio;
@@ -434,7 +435,7 @@ CSerialThread::RESULT_ENUM CSerialThread::Open(SERIAL_CONF_TABLE& tSerialConfInf
 #ifdef _CSERIAL_THREAD_DEBUG_
 		printf("CSerialThread::Open - Already Serial Open.");
 #endif	// #ifdef _CSERIAL_THREAD_DEBUG_
-		return RESULT_ERROR_ALREADY_SERIAL_OPEN;
+		return RESULT_CSERIAL_THREAD_ERROR_SERIAL_OPEN_ALREADY;
 	}
 
 	// シリアルオープン処理
@@ -446,7 +447,7 @@ CSerialThread::RESULT_ENUM CSerialThread::Open(SERIAL_CONF_TABLE& tSerialConfInf
 #ifdef _CSERIAL_THREAD_DEBUG_
 		perror("CSerialThread::Open - open");
 #endif	// #ifdef _CSERIAL_THREAD_DEBUG_
-		return RESULT_ERROR_START;
+		return RESULT_CSERIAL_THREAD_ERROR_SERIAL_OPEN;
 	}
 
 	// シリアルボーレート設定
@@ -460,7 +461,7 @@ CSerialThread::RESULT_ENUM CSerialThread::Open(SERIAL_CONF_TABLE& tSerialConfInf
 		perror("CSerialThread::Open - cfsetispeed");
 #endif	// #ifdef _CSERIAL_THREAD_DEBUG_
 		Close();
-		return RESULT_ERROR_SERIAL_SET_BAUDRATE;
+		return RESULT_CSERIAL_THREAD_ERROR_SERIAL_SET_BAUDRATE;
 	}
 
 	iRet = cfsetospeed(&tNewtio, m_tSerialConfInfo.tBaudRate.BaureateDefine);
@@ -472,7 +473,7 @@ CSerialThread::RESULT_ENUM CSerialThread::Open(SERIAL_CONF_TABLE& tSerialConfInf
 		perror("CSerialThread::Open - cfsetospeed");
 #endif	// #ifdef _CSERIAL_THREAD_DEBUG_
 		Close();
-		return RESULT_ERROR_SERIAL_SET_BAUDRATE;
+		return RESULT_CSERIAL_THREAD_ERROR_SERIAL_SET_BAUDRATE;
 	}
 
 	// シリアル属性設定
@@ -501,27 +502,27 @@ CSerialThread::RESULT_ENUM CSerialThread::Open(SERIAL_CONF_TABLE& tSerialConfInf
 		perror("CSerialThread::Open - tcsetattr");
 #endif	// #ifdef _CSERIAL_THREAD_DEBUG_
 		Close();
-		return RESULT_ERROR_START;
+		return RESULT_CSERIAL_THREAD_ERROR_SERIAL_SET_ATTRIBUTE;
 	}
 
-	return RESULT_SUCCESS;
+	return ::RESULT_SUCCESS;
 }
 
 //-----------------------------------------------------------------------------
 // シリアルクローズ
 //-----------------------------------------------------------------------------
-CSerialThread::RESULT_ENUM CSerialThread::Close(void)
+RESULT_HEADER_ENUM CSerialThread::Close(void)
 {
 	// 既にクローズしている場合
 	if (m_SerialFd == -1)
 	{
-		return RESULT_SUCCESS;
+		return ::RESULT_SUCCESS;
 	}
 
 	close(m_SerialFd);
 	m_SerialFd = -1;
 
-	return RESULT_SUCCESS;
+	return ::RESULT_SUCCESS;
 }
 
 
@@ -739,7 +740,7 @@ bSendData = true;
 		if ((tTempSeriarData.Size > 0) && (tTempSeriarData.pData != NULL))
 		{
 			WriteNum = write(this->m_SerialFd, tTempSeriarData.pData, tTempSeriarData.Size);
-			if (WriteNum != tTempSeriarData.Size)
+			if (WriteNum != (ssize_t)tTempSeriarData.Size)
 			{
 				m_tClassParam.pcLog->Output(CLog::LOG_OUTPUT_ERROR, "CSerialThread::SerialSendProc - write Error. [WriteNum:%ld, tTempSeriarData.Size:%ld]", WriteNum, tTempSeriarData.Size);
 #ifdef _CSERIAL_THREAD_DEBUG_
@@ -793,7 +794,7 @@ bSendData = true;
 //-----------------------------------------------------------------------------
 // IRQシリアル通信データ登録
 //-----------------------------------------------------------------------------
-CSerialThread::RESULT_ENUM CSerialThread::SetIrqSerialDataList(SERIAL_DATA_TABLE& tSerialData)
+RESULT_HEADER_ENUM CSerialThread::SetIrqSerialDataList(SERIAL_DATA_TABLE& tSerialData)
 {
 	bool				bRet = false;
 
@@ -805,7 +806,7 @@ CSerialThread::RESULT_ENUM CSerialThread::SetIrqSerialDataList(SERIAL_DATA_TABLE
 #ifdef _CSERIAL_THREAD_DEBUG_
 		printf("CSerialThread::SetIrqSerialDataList - Not InitProc.");
 #endif	// #ifdef _CSERIAL_THREAD_DEBUG_
-		return RESULT_ERROR_INIT;
+		return RESULT_CSERIAL_THREAD_ERROR_INIT;
 	}
 
 	// 既にスレッドが停止している場合
@@ -816,7 +817,7 @@ CSerialThread::RESULT_ENUM CSerialThread::SetIrqSerialDataList(SERIAL_DATA_TABLE
 #ifdef _CSERIAL_THREAD_DEBUG_
 		printf("CSerialThread::SetIrqSerialDataList - Thread is Not Active.");
 #endif	// #ifdef _CSERIAL_THREAD_DEBUG_
-		return RESULT_ERROR_THREAD_NOT_ACTIVE;
+		return RESULT_CSERIAL_THREAD_ERROR_THREAD_NOT_ACTIVE;
 	}
 
 	// ▼▽▼▽▼▽▼▽▼▽▼▽▼▽▼▽▼▽▼▽▼▽▼▽▼▽▼▽▼
@@ -830,7 +831,7 @@ CSerialThread::RESULT_ENUM CSerialThread::SetIrqSerialDataList(SERIAL_DATA_TABLE
 
 	m_cSerialDataEvent.SetEvent();
 
-	return RESULT_SUCCESS;
+	return ::RESULT_SUCCESS;
 }
 
 
@@ -874,7 +875,7 @@ void CSerialThread::ClearIrqSerialDataList(void)
 //-----------------------------------------------------------------------------
 // シリアル通信データ登録
 //-----------------------------------------------------------------------------
-CSerialThread::RESULT_ENUM CSerialThread::SetSerialDataList(SERIAL_DATA_TABLE& tSerialData)
+RESULT_HEADER_ENUM CSerialThread::SetSerialDataList(SERIAL_DATA_TABLE& tSerialData)
 {
 	bool				bRet = false;
 
@@ -886,7 +887,7 @@ CSerialThread::RESULT_ENUM CSerialThread::SetSerialDataList(SERIAL_DATA_TABLE& t
 #ifdef _CSERIAL_THREAD_DEBUG_
 		printf("CSerialThread::SetSerialDataList - Not InitProc.");
 #endif	// #ifdef _CSERIAL_THREAD_DEBUG_
-		return RESULT_ERROR_INIT;
+		return RESULT_CSERIAL_THREAD_ERROR_INIT;
 	}
 
 	// 既にスレッドが停止している場合
@@ -897,7 +898,7 @@ CSerialThread::RESULT_ENUM CSerialThread::SetSerialDataList(SERIAL_DATA_TABLE& t
 #ifdef _CSERIAL_THREAD_DEBUG_
 		printf("CSerialThread::SetSerialDataList - Thread is Not Active.");
 #endif	// #ifdef _CSERIAL_THREAD_DEBUG_
-		return RESULT_ERROR_THREAD_NOT_ACTIVE;
+		return RESULT_CSERIAL_THREAD_ERROR_THREAD_NOT_ACTIVE;
 	}
 
 	// ▼▽▼▽▼▽▼▽▼▽▼▽▼▽▼▽▼▽▼▽▼▽▼▽▼▽▼▽▼
@@ -911,7 +912,7 @@ CSerialThread::RESULT_ENUM CSerialThread::SetSerialDataList(SERIAL_DATA_TABLE& t
 
 	m_cSerialDataEvent.SetEvent();
 
-	return RESULT_SUCCESS;
+	return ::RESULT_SUCCESS;
 }
 
 

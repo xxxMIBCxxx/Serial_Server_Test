@@ -6,18 +6,20 @@
 #include "CLog.h"
 #include "CConfFile.h"
 #include "mcheck.h"
+#include "ResultHeader.h"
+
 
 #define ESC						( 27 )
 
 
 int main()
 {
-	mtrace();
+//	mtrace();
 
 
 	CLog							cLog;
 	CConfFile						cConfFile;
-
+	RESULT_HEADER_ENUM				eRet = ::RESULT_SUCCESS;
 
 	CSerialThread::CLASS_PARAM_TABLE			tClassParam;
 	tClassParam.pcLog = &cLog;
@@ -29,13 +31,13 @@ int main()
 	tTimeSpec.tv_nsec = 500000000;
 
 
-	CSerialThread::RESULT_ENUM eRet = pcSerialThread->Start();
-	if (eRet == CSerialThread::RESULT_SUCCESS)
+	eRet = pcSerialThread->Start();
+	if (eRet == ::RESULT_SUCCESS)
 	{
 		printf("-----[ CSerialThread Demo ]-----\n");
 		printf(" [Enter] key : Demo End\n");
 
-		malloc(100);
+//		malloc(100);
 
 		while (1)
 		{
@@ -64,7 +66,7 @@ int main()
 
 	delete pcSerialThread;
 
-	muntrace();
+//	muntrace();
 
 	return 0;
 }

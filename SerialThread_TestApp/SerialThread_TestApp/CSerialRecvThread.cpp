@@ -65,10 +65,9 @@ CSerialRecvThread::~CSerialRecvThread()
 //-----------------------------------------------------------------------------
 // シリアル通信受信スレッド開始
 //-----------------------------------------------------------------------------
-CSerialRecvThread::RESULT_ENUM CSerialRecvThread::Start()
+RESULT_HEADER_ENUM CSerialRecvThread::Start()
 {
 	bool						bRet = false;
-	RESULT_ENUM					eRet = RESULT_SUCCESS;
 	CThread::RESULT_ENUM		eThreadRet = CThread::RESULT_SUCCESS;
 
 
@@ -79,7 +78,7 @@ CSerialRecvThread::RESULT_ENUM CSerialRecvThread::Start()
 #ifdef _CSERIAL_RECV_THREAD_DEBUG_
 		printf("CSerialRecvThread::Start - Not InitProc.");
 #endif	// #ifdef _CSERIAL_RECV_THREAD_DEBUG_
-		return RESULT_ERROR_INIT;
+		return RESULT_CSERIAL_RECV_THREAD_ERROR_INIT;
 	}
 
 	// 既にスレッドが動作している場合
@@ -90,7 +89,7 @@ CSerialRecvThread::RESULT_ENUM CSerialRecvThread::Start()
 #ifdef _CSERIAL_RECV_THREAD_DEBUG_
 		printf("CSerialRecvThread::Start - Thread is Active.");
 #endif	// #ifdef _CSERIAL_RECV_THREAD_DEBUG_
-		return RESULT_ERROR_ALREADY_STARTED;
+		return RESULT_CSERIAL_RECV_THREAD_ERROR_THREAD_ALREADY_STARTED;
 	}
 
 	// シリアル通信受信スレッド開始
@@ -102,17 +101,17 @@ CSerialRecvThread::RESULT_ENUM CSerialRecvThread::Start()
 #ifdef _CSERIAL_RECV_THREAD_DEBUG_
 		perror("CSerialRecvThread::Start - Start Error.");
 #endif	// #ifdef _CSERIAL_RECV_THREAD_DEBUG_
-		return (CSerialRecvThread::RESULT_ENUM)eThreadRet;
+		return RESULT_CSERIAL_RECV_THREAD_ERROR_THREAD_START;
 	}
 
-	return RESULT_SUCCESS;
+	return ::RESULT_SUCCESS;
 }
 
 
 //-----------------------------------------------------------------------------
 // シリアル通信受信スレッド停止
 //-----------------------------------------------------------------------------
-CSerialRecvThread::RESULT_ENUM CSerialRecvThread::Stop()
+RESULT_HEADER_ENUM CSerialRecvThread::Stop()
 {
 	bool						bRet = false;
 
@@ -120,20 +119,20 @@ CSerialRecvThread::RESULT_ENUM CSerialRecvThread::Stop()
 	// 初期化処理が完了していない場合
 	if (m_bInitFlag == false)
 	{
-		return RESULT_ERROR_INIT;
+		return RESULT_CSERIAL_RECV_THREAD_ERROR_INIT;
 	}
 
 	// 既にスレッドが停止している場合
 	bRet = this->IsActive();
 	if (bRet == false)
 	{
-		return RESULT_SUCCESS;
+		return ::RESULT_SUCCESS;
 	}
 
 	// シリアル通信受信スレッド停止
 	CThread::Stop();
 
-	return RESULT_SUCCESS;
+	return ::RESULT_SUCCESS;
 }
 
 
